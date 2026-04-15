@@ -95,6 +95,12 @@ Ch 15: + external MCP tools, A2A partner agents                     ecosystem
 1. **Read the chapter** — understand the concept and why it matters.
 2. **Read the spec** — each chapter has a spec in `spec/chNN/` with interface contracts and expected behavior.
 3. **Build it** — implement the spec in your language. No code to copy. The spec is all you need.
+   > **Using Claude Code?** Install [The Builder's Handbook (TBH) plugin](https://github.com/tbhbooks/tbh-skill) for a guided build-along experience — specs, hints, validation, and progress tracking right inside your terminal:
+   > ```
+   > /plugin marketplace add tbhbooks/tbh-skill
+   > /plugin install tbh@the-builders-handbook
+   > /tbh:setup
+   > ```
 4. **Validate** — run the validation tests in `spec/chNN/validation/` to confirm your implementation works.
 5. **Move on** — each chapter builds on the last. Your agent grows incrementally.
 
