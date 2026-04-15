@@ -1,0 +1,45 @@
+# Auth routes
+# INTENTIONAL ISSUES:
+#   1. Token validation is broken — accepts any non-empty token (used in Ch 1, Ch 2)
+#   2. Duplicate logic with tasks.pseudo for error responses (used in Ch 10)
+
+function auth_routes(db):
+    router = new Router()
+
+    # POST /auth/register
+    router.post("/register", fn(req, res):
+        username = req.body.username
+        password = req.body.password
+
+        if username == null or password == null:
+            res.status(400).json({ error: "username and password required" })
+            return
+
+        # Check if user exists
+        existing = db.query_one("SELECT id FROM users WHERE username = ?", username)
+        if existing != null:
+            res.status(409).json({ error: "username taken" })
+            return
+
+        # Store user — password is hashed
+        hashed = hash_password(password)
+        user = db.insert("users", { username: username, password_hash: hashed })
+        res.status(201).json({ id: user.id, username: username })
+    )
+
+    # POST /auth/login
+    router.post("/login", fn(req, res):
+        username = req.body.username
+        password = req.body.password
+
+        user = db.query_one("SELECT * FROM users WHERE username = ?", username)
+        if user == null or not verify_password(password, user.password_hash):
+            res.status(401).json({ error: "invalid credentials" })
+            return
+
+        # BUG: Token is just the username base64-encoded — no signature, no expiry
+        token = base64_encode(username)
+        res.json({ token: token })
+    )
+
+    return router

@@ -1,0 +1,112 @@
+================================================================================
+CHAPTER 2 — EXPECTED OUTPUT
+================================================================================
+
+SETUP:
+  Agent is pointed at the todo-api/ codebase.
+  Agent loads files on startup.
+
+================================================================================
+SESSION: SINGLE QUESTION MODE
+================================================================================
+
+$ tbh-code --codebase ./todo-api --ask "Find the security vulnerability in the auth system"
+
+Loading codebase from ./todo-api ...
+  Loaded 9 files (skipped 0 binary, 0 oversized)
+
+{
+  "answer": "The auth middleware in src/middleware/auth.pseudo has a critical security vulnerability. The auth_middleware() function (line 8) checks if the Authorization header exists and is non-empty, but performs NO actual token validation. Specifically:\n\n1. The token is never decoded or parsed\n2. No signature verification occurs\n3. No expiry check\n4. The user is hardcoded to { id: 1, username: 'unknown' } regardless of the token\n\nThis means ANY non-empty string in the Authorization header grants full access as user 1. An attacker can send 'Authorization: anything' and bypass authentication entirely.\n\nAdditionally, there are no tests covering this middleware logic — tests/auth_test.pseudo only tests the /auth/register and /auth/login endpoints, not the middleware itself.",
+  "confidence": 0.95,
+  "sources": [
+    "src/middleware/auth.pseudo:8-15",
+    "src/routes/auth.pseudo:26-28",
+    "tests/auth_test.pseudo"
+  ]
+}
+
+NOTE: Compare to Ch 1 one-shot:
+  Ch 1 one-shot: invented "auth_handler.py" and "validate_token()" — WRONG
+  Ch 2 agent: correctly names "src/middleware/auth.pseudo" and "auth_middleware()" — RIGHT
+  The difference: Ch 2 agent actually read the files.
+
+================================================================================
+SESSION: INTERACTIVE MULTI-TURN
+================================================================================
+
+$ tbh-code --codebase ./todo-api
+
+Loading codebase from ./todo-api ...
+  Loaded 9 files (skipped 0 binary, 0 oversized)
+
+tbh-code> What files are in this project?
+
+{
+  "answer": "The todo-api project contains the following files:\n\n- src/main.pseudo — Entry point, sets up server and routes\n- src/routes/tasks.pseudo — CRUD endpoints for tasks\n- src/routes/auth.pseudo — Registration and login endpoints\n- src/models/task.pseudo — Task and Tag data models\n- src/models/user.pseudo — User data model\n- src/middleware/auth.pseudo — Authentication middleware\n- src/db.pseudo — Database connection and schema\n- tests/tasks_test.pseudo — Tests for task endpoints\n- tests/auth_test.pseudo — Tests for auth endpoints\n- README.md — Project documentation",
+  "confidence": 1.0,
+  "sources": [
+    "src/main.pseudo",
+    "src/routes/tasks.pseudo",
+    "src/routes/auth.pseudo",
+    "src/models/task.pseudo",
+    "src/models/user.pseudo",
+    "src/middleware/auth.pseudo",
+    "src/db.pseudo",
+    "tests/tasks_test.pseudo",
+    "tests/auth_test.pseudo",
+    "README.md"
+  ]
+}
+
+tbh-code> What does the auth middleware do?
+
+{
+  "answer": "The auth middleware (src/middleware/auth.pseudo) is responsible for authenticating incoming requests to protected routes. It:\n\n1. Reads the 'authorization' header from the request\n2. If the header is missing or empty, returns 401 with 'missing token'\n3. If the header is present, it sets req.user to { id: 1, username: 'unknown' }\n\nNotably, it does NOT actually validate the token — it only checks that a token is present and non-empty. Any string will pass.",
+  "confidence": 0.95,
+  "sources": ["src/middleware/auth.pseudo:8-15"]
+}
+
+tbh-code> Is there a bug in it?
+
+{
+  "answer": "Yes — a critical security bug. The middleware accepts ANY non-empty token as valid authentication. It should:\n\n1. Decode the token (the auth routes generate base64-encoded username as token)\n2. Verify the token has a valid signature (currently there is no signing)\n3. Check expiry (currently there is no expiry)\n4. Look up the actual user from the token data\n\nInstead, it hardcodes req.user = { id: 1, username: 'unknown' }, meaning:\n- Every authenticated request is treated as user 1\n- Users can see and modify each other's tasks\n- The per-user isolation in task routes (WHERE user_id = ?) is effectively broken\n\nThis was likely a placeholder that was never replaced with real validation.",
+  "confidence": 0.95,
+  "sources": [
+    "src/middleware/auth.pseudo:12-14",
+    "src/routes/auth.pseudo:27"
+  ]
+}
+
+tbh-code> Are there any tests for the token validation?
+
+{
+  "answer": "No. The auth tests in tests/auth_test.pseudo only cover:\n\n1. POST /auth/register — creating users\n2. POST /auth/login — logging in and getting a token\n\nThere are no tests for the auth middleware itself. Specifically, no test verifies that:\n- An invalid token is rejected\n- An expired token is rejected\n- Different users get different req.user values\n\nThis test gap means the middleware bug goes completely undetected by the test suite.",
+  "confidence": 1.0,
+  "sources": ["tests/auth_test.pseudo"]
+}
+
+NOTE: Key behaviors demonstrated:
+  ✓ Agent correctly references only files it has actually loaded
+  ✓ Multi-turn conversation — turn 3 builds on context from turn 2
+  ✓ Structured JSON output with answer, confidence, and sources
+  ✓ Sources include file paths and line numbers
+  ✓ Agent connects dots across files (auth routes generate base64 token → middleware doesn't validate it)
+  ✓ Confidence is high when evidence is strong, appropriately calibrated
+
+================================================================================
+SESSION: ADMITTING IGNORANCE
+================================================================================
+
+tbh-code> What database does this project use in production?
+
+{
+  "answer": "I can see that the project uses SQLite for its database (src/db.pseudo connects to a .db file). However, I don't have information about the production deployment — the codebase only shows the development database setup. There may be a separate production configuration that I don't have access to.",
+  "confidence": 0.5,
+  "sources": ["src/db.pseudo:5"]
+}
+
+NOTE: Agent correctly:
+  ✓ Answers what it CAN see (SQLite in the code)
+  ✓ Admits what it CANNOT see (production config)
+  ✓ Does NOT hallucinate a production database answer
+  ✓ Confidence is lower (0.5) reflecting partial knowledge

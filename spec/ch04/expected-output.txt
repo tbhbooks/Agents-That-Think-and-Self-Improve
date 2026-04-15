@@ -1,0 +1,225 @@
+================================================================================
+CHAPTER 4 — EXPECTED OUTPUT
+================================================================================
+
+SETUP:
+  Agent is pointed at the todo-api/ codebase.
+  Tools registered: read_file, list_files, search_code.
+  Skills loaded from skills/ directory: find-bug, add-endpoint, document-function.
+  All skills registered in the ToolRegistry as SkillTools.
+
+================================================================================
+SESSION 1: SKILL LOADING ON STARTUP
+================================================================================
+
+$ tbh-code --codebase ./todo-api
+
+Loading codebase from ./todo-api ...
+  Loaded 9 files
+  Registered 3 tools: read_file, list_files, search_code
+  Loading skills from skills/ ...
+  Loaded 3 skills: find-bug, add-endpoint, document-function
+  Total registry: 6 entries (3 tools + 3 skills)
+
+================================================================================
+SESSION 2: LISTING AVAILABLE SKILLS
+================================================================================
+
+$ tbh-code --codebase ./todo-api --list-skills
+
+Available skills (3):
+
+  find-bug
+    Systematically search for bugs in a specific area of the codebase
+    Trigger: find bug, debug, investigate, what's wrong, vulnerability, error
+    Tools used: search_code, read_file, list_files
+    Steps: 4
+
+  add-endpoint
+    Add a new API endpoint to the codebase
+    Trigger: add endpoint, new route, create API, add API
+    Tools used: list_files, read_file, search_code, write_file
+    Steps: 6
+
+  document-function
+    Generate documentation for a specific function
+    Trigger: document, explain function, add docs, describe function
+    Tools used: search_code, read_file
+    Steps: 4
+
+================================================================================
+SESSION 3: SKILL MATCHING AND EXECUTION
+================================================================================
+
+$ tbh-code --codebase ./todo-api --ask "Find the bug in the auth middleware"
+
+Loading codebase from ./todo-api ...
+  Loaded 9 files
+  Registered 3 tools: read_file, list_files, search_code
+  Loaded 3 skills: find-bug, add-endpoint, document-function
+
+[skill] Matched task to skill: find-bug (score: 0.85)
+[skill] Executing skill: find-bug
+[skill] Parameters: { "area": "src/middleware", "symptom": "auth" }
+
+[skill] Step 1/4: Search for code related to the symptom
+  [tool] search_code({ "pattern": "auth", "path": "src/middleware" })
+  [tool] Result: success=true
+    [
+      { "file": "src/middleware/auth.pseudo", "line": 1, "content": "# Authentication Middleware" },
+      { "file": "src/middleware/auth.pseudo", "line": 8, "content": "function auth_middleware(req, res, next):" }
+    ]
+
+[skill] Step 2/4: Read the most relevant file
+  [tool] read_file({ "path": "src/middleware/auth.pseudo" })
+  [tool] Result: success=true
+    <file contents>
+
+[skill] Step 3/4: Search for related tests
+  [tool] search_code({ "pattern": "auth", "path": "tests/" })
+  [tool] Result: success=true
+    [
+      { "file": "tests/auth_test.pseudo", "line": 1, "content": "# Auth Tests" }
+    ]
+
+[skill] Step 4/4: Read the test file if found
+  [tool] read_file({ "path": "tests/auth_test.pseudo" })
+  [tool] Result: success=true
+    <file contents>
+
+[skill] Skill "find-bug" completed successfully (4/4 steps)
+
+{
+  "answer": "The auth middleware in src/middleware/auth.pseudo has a critical security bug. The auth_middleware() function (line 8) checks if the Authorization header exists and is non-empty, but performs NO actual token validation:\n\n1. The token is never decoded or parsed\n2. No signature verification\n3. No expiry check\n4. req.user is hardcoded to { id: 1, username: 'unknown' } for ALL tokens\n\nThis means ANY non-empty Authorization header grants access as user 1.\n\nTest gap: tests/auth_test.pseudo only tests /auth/register and /auth/login — there are no tests for the middleware itself. The validation bug is completely uncovered by tests.",
+  "confidence": 0.95,
+  "sources": [
+    "src/middleware/auth.pseudo:8-15",
+    "tests/auth_test.pseudo"
+  ]
+}
+
+NOTE: Key behaviors demonstrated:
+  1. Skill MATCHED automatically — agent didn't need to be told which skill
+  2. Steps executed IN ORDER — search first, then read, then check tests
+  3. Each step used the RIGHT TOOL from the registry
+  4. Step outputs FLOWED to the next step (search result -> read file path)
+  5. Agent ANALYZED the aggregated context to produce the final answer
+  6. Same answer quality as Ch 3, but with a STRUCTURED approach
+
+================================================================================
+SESSION 4: EXPLICIT SKILL SELECTION
+================================================================================
+
+$ tbh-code --codebase ./todo-api --skill "document-function" --task "Document the auth_middleware function"
+
+[skill] Using skill: document-function
+[skill] Parameters: { "function_name": "auth_middleware" }
+
+[skill] Step 1/4: Search for the function definition
+  [tool] search_code({ "pattern": "function auth_middleware", "path": "." })
+  [tool] Result: success=true
+    [
+      { "file": "src/middleware/auth.pseudo", "line": 8, "content": "function auth_middleware(req, res, next):" }
+    ]
+
+[skill] Step 2/4: Read the file containing the function
+  [tool] read_file({ "path": "src/middleware/auth.pseudo" })
+  [tool] Result: success=true
+
+[skill] Step 3/4: Search for usages of the function (optional)
+  [tool] search_code({ "pattern": "auth_middleware", "path": "." })
+  [tool] Result: success=true
+    [
+      { "file": "src/main.pseudo", "line": 12, "content": "app.use(\"/tasks\", auth_middleware)" }
+    ]
+
+[skill] Step 4/4: Search for tests of the function (optional)
+  [tool] search_code({ "pattern": "auth_middleware", "path": "tests/" })
+  [tool] Result: success=true (0 matches)
+
+[skill] Skill "document-function" completed successfully (4/4 steps)
+
+{
+  "answer": "## auth_middleware(req, res, next)\n\n**File:** src/middleware/auth.pseudo:8\n\n**Purpose:** Authentication middleware that gates access to protected routes.\n\n**Parameters:**\n- req — the HTTP request object\n- res — the HTTP response object\n- next — callback to pass control to the next middleware\n\n**Behavior:**\n1. Reads the 'authorization' header from the request\n2. If missing or empty: returns 401 { error: 'missing token' }\n3. If present: sets req.user = { id: 1, username: 'unknown' } and calls next()\n\n**Used by:** src/main.pseudo:12 — applied to all /tasks routes\n\n**Tests:** None — no tests cover this middleware\n\n**Warning:** This function does NOT validate the token. Any non-empty Authorization header is accepted. This appears to be a placeholder.",
+  "confidence": 0.95,
+  "sources": [
+    "src/middleware/auth.pseudo:8-15",
+    "src/main.pseudo:12"
+  ]
+}
+
+================================================================================
+SESSION 5: SKILL WITH MISSING TOOL (BRIDGE TO CH 5)
+================================================================================
+
+$ tbh-code --codebase ./todo-api --skill "add-endpoint" --task "Add a GET /tasks/:id/tags endpoint"
+
+[skill] Using skill: add-endpoint
+[skill] Parameters: { "endpoint": "/tasks/:id/tags", "method": "GET", "description": "Get tags for a task" }
+
+[skill] Step 1/6: List existing route files to understand structure
+  [tool] list_files({ "path": "src/routes" })
+  [tool] Result: success=true
+
+[skill] Step 2/6: Read an existing route file as a template
+  [tool] read_file({ "path": "src/routes/tasks.pseudo" })
+  [tool] Result: success=true
+
+[skill] Step 3/6: Search for the router setup
+  [tool] search_code({ "pattern": "app.use", "path": "src/main.pseudo" })
+  [tool] Result: success=true
+
+[skill] Step 4/6: Write the new route file
+  [tool] write_file — ERROR: tool not registered
+[skill] Skill "add-endpoint" failed at step 4: tool 'write_file' is not registered
+
+{
+  "answer": "I was able to analyze the existing code structure and understand how routes are organized, but I cannot complete the 'add-endpoint' skill. Steps 4-6 require the write_file tool, which is not yet available.\n\nHere's what I found:\n- Routes are in src/routes/ (tasks.pseudo, auth.pseudo)\n- The router is set up in src/main.pseudo using app.use()\n- I know the pattern to follow, but I can't create or modify files.\n\nThe write_file tool needs to be implemented before this skill can run to completion.",
+  "confidence": 0.3,
+  "sources": [
+    "src/routes/tasks.pseudo",
+    "src/main.pseudo"
+  ]
+}
+
+NOTE: This is the BRIDGE TO CH 5. The skill knows what to do (write files)
+but the tool doesn't exist yet. The skill fails gracefully and explains why.
+
+================================================================================
+SESSION 6: FALLBACK — NO SKILL MATCHES
+================================================================================
+
+$ tbh-code --codebase ./todo-api --ask "What is the meaning of life?"
+
+Loading codebase from ./todo-api ...
+  Loaded 9 files
+  Registered 3 tools + 3 skills
+
+[skill] No matching skill found for task (best score: 0.05, threshold: 0.3)
+[skill] Falling back to general reasoning
+
+{
+  "answer": "That's a philosophical question outside the scope of codebase analysis. I'm a coding agent — I can help you find bugs, add endpoints, document functions, or answer questions about the todo-api codebase. Try asking me about the code!",
+  "confidence": 0.9,
+  "sources": []
+}
+
+NOTE: Agent correctly:
+  1. Tried to match a skill — none matched
+  2. Fell back to general reasoning
+  3. Didn't force a skill where none applies
+  4. Suggested what it CAN help with
+
+================================================================================
+KEY OBSERVATIONS FOR THE READER
+================================================================================
+
+1. SKILLS ARE TOOLS — SkillTool has the same execute() -> ToolResult interface
+2. SKILLS COMPOSE TOOLS — each step calls a tool from the registry
+3. SKILL MATCHING is automatic — the agent picks the right skill for the task
+4. STEP OUTPUTS FLOW — earlier step results feed into later step arguments
+5. GRACEFUL FAILURE — missing tools cause clear errors, not silent failures
+6. GRACEFUL FALLBACK — no skill match means general reasoning, not crash
+7. THE REGISTRY IS UNIFIED — SimpleTools, MCPTools, and SkillTools coexist
+8. Skills can REFERENCE tools that don't exist yet — the skill spec is a blueprint
+9. The bridge to Ch 5 is visible: skills want to WRITE but can't yet

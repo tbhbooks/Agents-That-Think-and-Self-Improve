@@ -1,0 +1,302 @@
+================================================================================
+CHAPTER 6 — EXPECTED OUTPUT
+================================================================================
+
+SETUP:
+  Agent is pointed at the todo-api/ codebase.
+  Tools registered: read_file, list_files, search_code, write_file,
+                    delete_file, execute_shell.
+  Skills loaded: find-bug, add-endpoint, document-function.
+  Permission model + action gates active.
+  Memory store initialized at .tbh-code/memory/
+  Session persistence enabled.
+
+================================================================================
+SESSION 1: AGENT WORKS ON TODO-API — FIRST SESSION
+================================================================================
+
+$ tbh-code --codebase ./todo-api --ask "Fix the auth middleware bug so it properly validates tokens, then run the tests"
+
+Loading codebase from ./todo-api ...
+  Registered 6 tools + 3 skills
+  Memory store: .tbh-code/memory/ (0 entries)
+  Session: f7a2c1 (new)
+
+[session: f7a2c1]
+
+[tool] Agent selected: search_code
+[tool] Arguments: { "pattern": "auth_middleware", "path": "src/" }
+[tool] Result: success=true
+
+[tool] Agent selected: read_file
+[tool] Arguments: { "path": "src/middleware/auth.pseudo" }
+[tool] Result: success=true
+
+[tool] Agent selected: write_file
+[tool] Arguments: { "path": "src/middleware/auth.pseudo", "content": "<fixed auth middleware>" }
+[gate] write operation: Agent wants to write src/middleware/auth.pseudo
+[gate] Approved
+[tool] Result: success=true
+
+[tool] Agent selected: execute_shell
+[tool] Arguments: { "command": "run-tests tests/", "timeout": 30 }
+[gate] DANGEROUS operation: Agent wants to execute: run-tests tests/
+[gate] Approved
+[tool] Result: success=true
+  { "stdout": "8 passed, 0 failed", "exit_code": 0 }
+
+[memory] Saving outcome: todo-api/auth-middleware-fix
+  {
+    "key": "todo-api/auth-middleware-fix",
+    "content": "Fixed auth middleware to decode base64 tokens and look up users in DB. Previously accepted any non-empty token and hardcoded user.",
+    "type": "outcome",
+    "tags": ["auth", "bug-fix", "todo-api", "middleware"],
+    "timestamp": "2025-01-15T14:30:00Z"
+  }
+[memory] Saving fact: todo-api/token-format
+  {
+    "key": "todo-api/token-format",
+    "content": "todo-api uses base64-encoded username as auth token. Tokens are generated in src/routes/auth.pseudo during login.",
+    "type": "fact",
+    "tags": ["auth", "token", "todo-api"],
+    "timestamp": "2025-01-15T14:30:00Z"
+  }
+[memory] Outcome metrics: { "tests_before": "4 pass, 1 fail", "tests_after": "8 pass, 0 fail", "files_modified": 2 }
+
+{
+  "answer": "Fixed the auth middleware bug. The middleware now decodes base64 tokens, looks up users in the database, and rejects invalid tokens. All 8 tests pass.",
+  "confidence": 0.95,
+  "sources": ["src/middleware/auth.pseudo", "tests/middleware_test.pseudo"]
+}
+
+Session saved: f7a2c1. Resume with --session f7a2c1
+
+NOTE: Key new behaviors:
+  1. Session ID assigned and displayed: [session: f7a2c1]
+  2. Outcome saved to memory store with structured metrics
+  3. Fact about token format extracted and saved
+  4. Session state saved on exit — ready to resume
+
+================================================================================
+SESSION 2: AGENT RESUMES — REMEMBERS PRIOR WORK
+================================================================================
+
+$ tbh-code --codebase ./todo-api --session f7a2c1
+
+Loading codebase from ./todo-api ...
+  Registered 6 tools + 3 skills
+  Memory store: .tbh-code/memory/ (2 entries)
+  Restoring session: f7a2c1
+  Session restored: conversation (12 messages), active task: none
+
+[session: f7a2c1] Resumed. Last active: 2025-01-15T14:30:00Z
+
+> Fix a similar token validation issue in the API key middleware
+
+[memory] Searching for relevant memories: "token validation middleware"
+[memory] Retrieved 2 entries:
+  1. [outcome] todo-api/auth-middleware-fix (score: 0.92)
+     "Fixed auth middleware to decode base64 tokens and look up users in DB"
+  2. [fact] todo-api/token-format (score: 0.78)
+     "todo-api uses base64-encoded username as auth token"
+
+[context] Budget allocation:
+  system_prompt:        1,800 / 2,000 tokens
+  conversation_history: 2,400 / 6,000 tokens (12 messages from prior session)
+  retrieved_memories:     600 / 3,000 tokens (2 entries)
+  loaded_files:             0 / 7,000 tokens
+  current_task:           350 / 2,000 tokens
+  TOTAL:                5,150 / 20,000 tokens
+
+[tool] Agent selected: search_code
+[tool] Arguments: { "pattern": "api_key", "path": "src/" }
+[tool] Result: success=true
+
+[tool] Agent selected: read_file
+[tool] Arguments: { "path": "src/middleware/api_key.pseudo" }
+[tool] Result: success=true
+
+{
+  "answer": "I found the API key middleware in src/middleware/api_key.pseudo. It has the same pattern as the auth middleware bug I fixed previously — it accepts any non-empty API key without validation. Based on my prior fix, the approach is: 1) decode/parse the API key, 2) validate against stored keys in the database, 3) reject invalid keys with 401. Want me to write the fix?",
+  "confidence": 0.9,
+  "sources": [
+    "src/middleware/api_key.pseudo",
+    "memory:todo-api/auth-middleware-fix"
+  ]
+}
+
+NOTE: Key behaviors demonstrated:
+  1. Session RESTORED — conversation history from session 1 is present
+  2. Memory RETRIEVED — agent found the prior auth fix outcome
+  3. Agent REFERENCED prior work — "same pattern as the auth middleware bug I fixed"
+  4. Agent proposed the SAME approach that worked before
+  5. Memory entries appear in sources alongside file references
+  6. Context budget shown — everything fits within allocation
+
+================================================================================
+SESSION 3: MEMORY RETRIEVAL — RELEVANT RANKING
+================================================================================
+
+$ tbh-code --codebase ./todo-api --ask "What do you know about how this codebase handles authentication?"
+
+Loading codebase from ./todo-api ...
+  Memory store: .tbh-code/memory/ (4 entries)
+  Session: b3d9e2 (new)
+
+[memory] Searching for relevant memories: "codebase authentication"
+[memory] Retrieved 3 entries:
+  1. [outcome] todo-api/auth-middleware-fix (score: 0.88)
+     "Fixed auth middleware to decode base64 tokens and look up users in DB"
+  2. [fact] todo-api/token-format (score: 0.82)
+     "todo-api uses base64-encoded username as auth token"
+  3. [outcome] todo-api/api-key-fix (score: 0.65)
+     "Fixed API key middleware with same pattern as auth fix"
+
+{
+  "answer": "Based on my previous work with this codebase:\n\n1. **Auth tokens:** todo-api uses base64-encoded usernames as auth tokens. Tokens are generated during login in src/routes/auth.pseudo.\n\n2. **Auth middleware:** I previously fixed the auth middleware (src/middleware/auth.pseudo) to properly decode tokens and look up users in the database. Before the fix, it accepted any non-empty token.\n\n3. **API keys:** I also fixed a similar validation issue in the API key middleware.\n\nThe authentication system is simple — base64 tokens, no JWT, no OAuth. The middleware pattern is consistent across auth and API key validation.",
+  "confidence": 0.9,
+  "sources": [
+    "memory:todo-api/auth-middleware-fix",
+    "memory:todo-api/token-format",
+    "memory:todo-api/api-key-fix"
+  ]
+}
+
+NOTE: The agent answered from MEMORY — it didn't need to search the codebase.
+It synthesized knowledge from multiple memory entries, ranked by relevance.
+This is the payoff: the agent knows things about the codebase from prior work.
+
+================================================================================
+SESSION 4: CONTEXT BUDGET — ALLOCATION MATH
+================================================================================
+
+$ tbh-code --codebase ./todo-api --ask "Read every file in the codebase and summarize the architecture"
+
+Loading codebase from ./todo-api ...
+  Memory store: .tbh-code/memory/ (4 entries)
+  Session: c8f1a0 (new)
+
+[tool] Agent selected: list_files
+[tool] Arguments: { "path": ".", "recursive": true }
+[tool] Result: success=true (14 files)
+
+[context] Budget check before loading files:
+  system_prompt:        1,800 / 2,000 tokens
+  conversation_history:     0 / 6,000 tokens (new session)
+  retrieved_memories:     400 / 3,000 tokens (4 entries)
+  loaded_files:             0 / 7,000 tokens (budget for files)
+  current_task:           200 / 2,000 tokens
+
+[context] Loading files by priority:
+  src/main.pseudo          →    480 tokens  ✓ loaded (entry point)
+  src/routes/tasks.pseudo  →  1,120 tokens  ✓ loaded (core routes)
+  src/routes/auth.pseudo   →    760 tokens  ✓ loaded (auth routes)
+  src/middleware/auth.pseudo →   560 tokens  ✓ loaded (auth middleware)
+  src/models/task.pseudo   →    440 tokens  ✓ loaded
+  src/models/user.pseudo   →    320 tokens  ✓ loaded
+  src/db.pseudo            →    880 tokens  ✓ loaded
+  tests/tasks_test.pseudo  →  1,240 tokens  ✓ loaded
+  tests/auth_test.pseudo   →    960 tokens  ✓ loaded
+  ... remaining 5 files    →  2,640 tokens  ✓ loaded
+  TOTAL files loaded: 14    →  9,400 tokens
+
+[context] WARNING: loaded_files (9,400) exceeds budget (7,000)
+[context] Trimming lowest-priority files:
+  DROPPED: tests/middleware_test.pseudo (920 tokens, lowest priority)
+  DROPPED: tests/auth_test.pseudo (960 tokens, lowest priority)
+  DROPPED: config.pseudo (320 tokens, lowest priority)
+  DROPPED: README.pseudo (240 tokens, lowest priority)
+  Adjusted: 6,960 tokens ✓ within budget
+
+[context] Final allocation:
+  system_prompt:         1,800 / 2,000  (90.0%)
+  conversation_history:      0 / 6,000  (0.0%)
+  retrieved_memories:      400 / 3,000  (13.3%)
+  loaded_files:          6,960 / 7,000  (99.4%)  ← nearly full
+  current_task:            200 / 2,000  (10.0%)
+  TOTAL:                 9,360 / 20,000 (46.8%)
+
+{
+  "answer": "Here's the architecture of todo-api:\n\n**Entry point:** src/main.pseudo — sets up the Express-style app, applies middleware, mounts routes.\n\n**Routes:**\n- src/routes/tasks.pseudo — CRUD for tasks (GET /tasks, POST /tasks, etc.)\n- src/routes/auth.pseudo — register and login (POST /auth/register, POST /auth/login)\n\n**Middleware:**\n- src/middleware/auth.pseudo — validates auth tokens on protected routes\n\n**Models:**\n- src/models/task.pseudo — Task { id, title, completed, user_id }\n- src/models/user.pseudo — User { id, username, password }\n\n**Database:**\n- src/db.pseudo — in-memory store with find/save/delete operations\n\nNote: I loaded 10 of 14 files within context budget. Four files were trimmed to stay within limits — two test files, a config file, and the README.",
+  "confidence": 0.75,
+  "sources": ["src/main.pseudo", "src/routes/tasks.pseudo", "src/routes/auth.pseudo", "src/db.pseudo"]
+}
+
+NOTE: Context budget in action (20K demo window):
+  1. Agent tried to load all 14 files
+  2. Budget detected overflow (9,400 > 7,000)
+  3. Four lowest-priority files were trimmed
+  4. Agent noted the trimming in its answer — transparent about limits
+  5. No context window overflow — budget enforced
+  6. At 20K, even a small codebase overflows — the technique is visible
+
+================================================================================
+SESSION 5: OUTCOME TRACKING — STRUCTURED LOGGING
+================================================================================
+
+$ tbh-code --codebase ./todo-api --auto-approve --ask "Add input validation to POST /tasks — title must be non-empty and under 200 chars"
+
+[session: d4e5f6]
+
+[tool] Agent selected: read_file
+[tool] Arguments: { "path": "src/routes/tasks.pseudo" }
+[tool] Result: success=true
+
+[tool] Agent selected: write_file
+[tool] Arguments: { "path": "src/routes/tasks.pseudo", "content": "<updated with validation>" }
+[gate] Approved (auto-approve)
+[tool] Result: success=true
+
+[tool] Agent selected: execute_shell
+[tool] Arguments: { "command": "run-tests tests/", "timeout": 30 }
+[gate] Approved (auto-approve)
+[tool] Result: success=true
+  { "stdout": "9 passed, 0 failed", "exit_code": 0 }
+
+[memory] Saving outcome: todo-api/input-validation-post-tasks
+  {
+    "key": "todo-api/input-validation-post-tasks",
+    "type": "outcome",
+    "content": "Added input validation to POST /tasks: title must be non-empty string under 200 characters. Returns 400 with error message for invalid input.",
+    "tags": ["validation", "tasks", "todo-api", "input-validation"],
+    "timestamp": "2025-01-16T10:15:00Z"
+  }
+[memory] Outcome metrics:
+  {
+    "task": "Add input validation to POST /tasks",
+    "action": "Added title length check (1-200 chars) with 400 response for violations",
+    "result": "success",
+    "metrics": {
+      "tests_before": "8 pass, 0 fail",
+      "tests_after": "9 pass, 0 fail",
+      "files_modified": 1,
+      "lines_changed": 12
+    },
+    "diagnosis": "Straightforward validation. Added guard clause at top of POST handler. One new test for empty title, one for long title. All existing tests still pass."
+  }
+
+{
+  "answer": "Added input validation to POST /tasks. The title field must be a non-empty string under 200 characters. Invalid requests now return 400 with a descriptive error message. All 9 tests pass (1 new test added for validation).",
+  "confidence": 0.95,
+  "sources": ["src/routes/tasks.pseudo"]
+}
+
+NOTE: Outcome tracking details:
+  1. Outcome is STRUCTURED — not just "it worked"
+  2. Metrics include before/after test counts and lines changed
+  3. Diagnosis explains WHY it worked: "straightforward validation, guard clause"
+  4. This data feeds Ch 9: the agent can later ask "what worked for validation tasks?"
+  5. Tags enable future retrieval: search("validation") will find this
+
+================================================================================
+KEY OBSERVATIONS FOR THE READER
+================================================================================
+
+1. MEMORY PERSISTS — agent remembers facts and outcomes across sessions
+2. SESSION RESTORE — conversation history and context survive agent restart
+3. CONTEXT BUDGET — finite window, explicit allocation, graceful trimming
+4. RETRIEVAL RANKING — memories scored by keyword relevance + recency
+5. OUTCOME TRACKING — every task logs structured metrics and diagnosis
+6. RULES — behavioral constraints persist as memory entries (type: rule)
+7. The bridge to Ch 7: the agent remembers, but doesn't plan — it dives into complex tasks without decomposition
+8. The bridge to Ch 9: outcomes are logged but don't change behavior yet

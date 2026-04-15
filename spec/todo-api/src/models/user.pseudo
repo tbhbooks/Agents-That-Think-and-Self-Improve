@@ -1,0 +1,7 @@
+# User model
+
+User:
+    id: integer (auto-generated)
+    username: string (unique, required)
+    password_hash: string (bcrypt hash)
+    created_at: timestamp

@@ -1,0 +1,355 @@
+================================================================================
+CHAPTER 7 — EXPECTED OUTPUT
+================================================================================
+
+SETUP:
+  Agent is pointed at the todo-api/ codebase.
+  Tools registered: read_file, list_files, search_code, write_file,
+                    delete_file, execute_shell.
+  Skills loaded: find-bug, add-endpoint, document-function.
+  Memory store active with some entries from prior sessions.
+  Session persistence enabled.
+  Planning engine active.
+
+================================================================================
+SESSION 1: TASK DECOMPOSITION — MULTI-STEP PLAN
+================================================================================
+
+$ tbh-code --codebase ./todo-api --auto-approve --ask "Add input validation to POST /tasks — title must be non-empty and under 200 chars"
+
+Loading codebase from ./todo-api ...
+  Registered 6 tools + 3 skills
+  Memory store: .tbh-code/memory/ (3 entries)
+  Session: a1b2c3 (new)
+
+[plan] Decomposing task: "Add input validation to POST /tasks — title must be non-empty and under 200 chars"
+
+[memory] Searching for relevant strategies: "add validation"
+[memory] Retrieved 0 strategy entries (first time for this task type)
+
+[plan] Generated plan (5 steps):
+  Step 1: Read the current POST /tasks handler          [read_file]
+  Step 2: Search for existing validation patterns        [search_code]
+  Step 3: Write updated handler with title validation    [write_file]
+  Step 4: Write test for title validation                [write_file]
+  Step 5: Run test suite to verify                       [execute_shell]
+
+[plan] Executing...
+
+--- Step 1/5 ---
+[think] Step 1: I need to read the current POST /tasks handler to understand
+        the existing code structure before I make changes. Can't write a fix
+        without knowing what I'm fixing.
+[tool] Agent selected: read_file
+[tool] Arguments: { "path": "src/routes/tasks.pseudo" }
+[tool] Result: success=true
+[plan] Step 1 completed: Read the current POST /tasks handler
+
+--- Step 2/5 ---
+[think] Step 2: Before writing validation, I should check if there are existing
+        validation patterns in the codebase I should follow for consistency.
+[tool] Agent selected: search_code
+[tool] Arguments: { "pattern": "validate\\|validation\\|required", "path": "src/" }
+[tool] Result: success=true
+  [
+    { "file": "src/routes/auth.pseudo", "line": 12, "content": "if not username or not password:" }
+  ]
+[plan] Step 2 completed: Search for existing validation patterns
+
+--- Step 3/5 ---
+[think] Step 3: Now I know the existing handler structure and the validation
+        pattern used in auth routes. I'll add a guard clause at the top of
+        the POST handler, matching the style in auth routes.
+[tool] Agent selected: write_file
+[tool] Arguments: {
+  "path": "src/routes/tasks.pseudo",
+  "content": "<updated with validation: guard clause checking title is non-empty string under 200 chars, returns 400 with error message>"
+}
+[gate] Approved (auto-approve)
+[tool] Result: success=true
+  { "written": true, "path": "src/routes/tasks.pseudo", "bytes": 1847 }
+[plan] Step 3 completed: Write updated handler with title validation
+
+--- Step 4/5 ---
+[think] Step 4: I need to verify my validation works. I'll write tests for
+        three cases: empty title (should fail), title over 200 chars (should
+        fail), and valid title (should succeed).
+[tool] Agent selected: write_file
+[tool] Arguments: {
+  "path": "tests/validation_test.pseudo",
+  "content": "<test file with test_rejects_empty_title, test_rejects_long_title, test_accepts_valid_title>"
+}
+[gate] Approved (auto-approve)
+[tool] Result: success=true
+  { "written": true, "path": "tests/validation_test.pseudo", "bytes": 934 }
+[plan] Step 4 completed: Write test for title validation
+
+--- Step 5/5 ---
+[think] Step 5: Run the full test suite to make sure my changes don't break
+        existing functionality and the new validation tests pass.
+[tool] Agent selected: execute_shell
+[tool] Arguments: { "command": "run-tests tests/", "timeout": 30 }
+[gate] Approved (auto-approve)
+[tool] Result: success=true
+  {
+    "stdout": "Running tests...\n  PASS  test_create_task\n  PASS  test_get_tasks\n  PASS  test_register_user\n  PASS  test_login_user\n  PASS  test_rejects_empty_title\n  PASS  test_rejects_long_title\n  PASS  test_accepts_valid_title\n\n7 passed, 0 failed",
+    "exit_code": 0
+  }
+[plan] Step 5 completed: Run test suite to verify
+
+[plan] Plan completed: 5/5 steps succeeded
+
+[memory] Saving strategy: add-feature/input-validation
+  {
+    "task_type": "add-feature",
+    "strategy_used": "read-existing → search-patterns → write-code → write-tests → run-tests",
+    "steps_count": 5,
+    "steps_completed": 5,
+    "outcome": "success",
+    "replanned": false
+  }
+
+{
+  "answer": "Added input validation to POST /tasks.\n\nChanges:\n1. src/routes/tasks.pseudo — Added guard clause: title must be non-empty string under 200 characters. Returns 400 with descriptive error for violations.\n2. tests/validation_test.pseudo — Added 3 test cases:\n   - test_rejects_empty_title (400 response)\n   - test_rejects_long_title (400 response)\n   - test_accepts_valid_title (201 response)\n\nAll 7 tests pass (4 existing + 3 new).",
+  "confidence": 0.95,
+  "sources": ["src/routes/tasks.pseudo", "tests/validation_test.pseudo"]
+}
+
+NOTE: Key planning behaviors:
+  1. Task DECOMPOSED into 5 ordered steps before any execution
+  2. Each step has [think] reasoning BEFORE the tool call
+  3. Steps execute IN ORDER — read before write, write before test
+  4. Results FLOW FORWARD — step 3 uses knowledge from steps 1 and 2
+  5. Strategy LOGGED to memory for future reference
+
+================================================================================
+SESSION 2: STEP FAILURE AND REPLANNING
+================================================================================
+
+$ tbh-code --codebase ./todo-api --auto-approve --ask "Add rate limiting to the POST /tasks endpoint — max 10 requests per minute per user"
+
+[session: d4e5f6]
+
+[plan] Decomposing task: "Add rate limiting to POST /tasks"
+
+[memory] Searching for relevant strategies: "add rate limiting"
+[memory] Retrieved 1 strategy entry:
+  1. [strategy] add-feature/input-validation (score: 0.72)
+     "read-existing → search-patterns → write-code → write-tests → run-tests"
+
+[plan] Generated plan (6 steps):
+  Step 1: Read the current POST /tasks handler          [read_file]
+  Step 2: Search for existing rate limiting patterns     [search_code]
+  Step 3: Write rate limiter middleware                   [write_file]
+  Step 4: Apply rate limiter to POST /tasks route        [write_file]
+  Step 5: Write rate limiting tests                      [write_file]
+  Step 6: Run test suite                                 [execute_shell]
+
+[plan] Executing...
+
+--- Step 1/6 ---
+[think] Step 1: Read the current handler to understand how middleware is applied.
+[tool] Agent selected: read_file
+[tool] Arguments: { "path": "src/routes/tasks.pseudo" }
+[tool] Result: success=true
+[plan] Step 1 completed
+
+--- Step 2/6 ---
+[think] Step 2: Check if there's already a rate limiting mechanism I can reuse.
+[tool] Agent selected: search_code
+[tool] Arguments: { "pattern": "rate_limit\\|throttle\\|per_minute", "path": "src/" }
+[tool] Result: success=true (0 matches)
+[plan] Step 2 completed: No existing rate limiting found — will create from scratch
+
+--- Step 3/6 ---
+[think] Step 3: Create a new rate limiter middleware. I'll use an in-memory
+        counter keyed by user ID, with a sliding window of 60 seconds.
+[tool] Agent selected: write_file
+[tool] Arguments: { "path": "src/middleware/rate_limiter.pseudo", "content": "<rate limiter middleware>" }
+[gate] Approved (auto-approve)
+[tool] Result: success=true
+[plan] Step 3 completed
+
+--- Step 4/6 ---
+[think] Step 4: Apply the rate limiter to the POST /tasks route in main.pseudo.
+[tool] Agent selected: read_file
+[tool] Arguments: { "path": "src/main.pseudo" }
+[tool] Result: success=true
+
+[tool] Agent selected: write_file
+[tool] Arguments: { "path": "src/main.pseudo", "content": "<updated with rate_limiter import and app.use>" }
+[gate] Approved (auto-approve)
+[tool] Result: success=true
+[plan] Step 4 completed
+
+--- Step 5/6 ---
+[think] Step 5: Write tests for rate limiting — need to verify the 10th request
+        succeeds and the 11th is rejected within a minute window.
+[tool] Agent selected: write_file
+[tool] Arguments: { "path": "tests/rate_limit_test.pseudo", "content": "<rate limit tests>" }
+[gate] Approved (auto-approve)
+[tool] Result: success=true
+[plan] Step 5 completed
+
+--- Step 6/6 ---
+[think] Step 6: Run tests to confirm rate limiting works and nothing else broke.
+[tool] Agent selected: execute_shell
+[tool] Arguments: { "command": "run-tests tests/", "timeout": 30 }
+[gate] Approved (auto-approve)
+[tool] Result: success=false
+  {
+    "stdout": "Running tests...\n  PASS  test_create_task\n  PASS  test_get_tasks\n  FAIL  test_rate_limit_blocks_excess\n    Error: expected status 429, got 200\n  PASS  test_rate_limit_allows_under_limit\n\n3 passed, 1 failed",
+    "exit_code": 1
+  }
+
+[plan] Step 6 FAILED: test_rate_limit_blocks_excess failed — rate limiter not blocking excess requests
+
+--- REPLANNING ---
+
+[plan] Failure analysis: The rate limiter middleware was written but isn't
+       correctly counting requests. The test expects 429 but gets 200.
+[plan] Generating new plan from failure point...
+
+[plan] Replan (3 steps):
+  Step 6a: Read the rate limiter middleware to find the bug     [read_file]
+  Step 6b: Fix the rate limiter counter logic                    [write_file]
+  Step 6c: Run tests again                                       [execute_shell]
+
+--- Step 6a ---
+[think] Step 6a: I need to read the rate limiter to find why it's not blocking.
+        The counter might not be incrementing properly.
+[tool] Agent selected: read_file
+[tool] Arguments: { "path": "src/middleware/rate_limiter.pseudo" }
+[tool] Result: success=true
+
+--- Step 6b ---
+[think] Step 6b: Found the bug — the counter resets on every request instead of
+        accumulating. The window check was comparing timestamps incorrectly.
+        Fixing the counter to persist across requests.
+[tool] Agent selected: write_file
+[tool] Arguments: { "path": "src/middleware/rate_limiter.pseudo", "content": "<fixed rate limiter>" }
+[gate] Approved (auto-approve)
+[tool] Result: success=true
+
+--- Step 6c ---
+[think] Step 6c: Re-running tests after the fix.
+[tool] Agent selected: execute_shell
+[tool] Arguments: { "command": "run-tests tests/", "timeout": 30 }
+[gate] Approved (auto-approve)
+[tool] Result: success=true
+  {
+    "stdout": "Running tests...\n  PASS  test_create_task\n  PASS  test_get_tasks\n  PASS  test_rate_limit_blocks_excess\n  PASS  test_rate_limit_allows_under_limit\n\n4 passed, 0 failed",
+    "exit_code": 0
+  }
+
+[plan] Replan completed: 3/3 steps succeeded
+[plan] Overall: 8 steps total (5 original + 3 replan), all completed
+
+[memory] Saving strategy: add-feature/rate-limiting
+  {
+    "task_type": "add-feature",
+    "strategy_used": "read-existing → search-patterns → write-middleware → apply-middleware → write-tests → run-tests (replanned: fix-middleware → rerun-tests)",
+    "steps_count": 8,
+    "steps_completed": 8,
+    "outcome": "success",
+    "replanned": true
+  }
+
+{
+  "answer": "Added rate limiting to POST /tasks — max 10 requests per minute per user.\n\nChanges:\n1. src/middleware/rate_limiter.pseudo — New middleware with sliding window counter (60s window, 10 request limit). Returns 429 when exceeded.\n2. src/main.pseudo — Applied rate limiter middleware to task routes.\n3. tests/rate_limit_test.pseudo — 2 test cases (under limit: allowed, over limit: 429).\n\nNote: Initial implementation had a counter bug (reset on each request). Detected by tests, fixed via replanning. All 4 tests pass.",
+  "confidence": 0.9,
+  "sources": [
+    "src/middleware/rate_limiter.pseudo",
+    "src/main.pseudo",
+    "tests/rate_limit_test.pseudo"
+  ]
+}
+
+NOTE: Replanning in action:
+  1. Step 6 (run tests) FAILED — rate limiter not working
+  2. Agent didn't crash or give up
+  3. Agent generated a REPLAN: diagnose → fix → retest
+  4. Replan succeeded — all tests pass
+  5. Strategy log records that replanning was needed
+  6. Agent REPORTED the replan transparently — told the user about the bug and fix
+
+================================================================================
+SESSION 3: STRATEGY REUSE — LEARNED APPROACH
+================================================================================
+
+$ tbh-code --codebase ./todo-api --auto-approve --ask "Add input validation to the PUT /tasks/:id endpoint — title same rules as POST"
+
+[session: g7h8i9]
+
+[plan] Decomposing task: "Add input validation to PUT /tasks/:id"
+
+[memory] Searching for relevant strategies: "add validation"
+[memory] Retrieved 1 strategy entry:
+  1. [strategy] add-feature/input-validation (score: 0.95)
+     "read-existing → search-patterns → write-code → write-tests → run-tests"
+     Outcome: success (5/5 steps, no replan needed)
+
+[plan] Using prior strategy: read-existing → search-patterns → write-code → write-tests → run-tests
+[plan] Generated plan (5 steps):
+  Step 1: Read the current PUT /tasks/:id handler        [read_file]
+  Step 2: Read the POST validation as reference           [read_file]
+  Step 3: Write updated PUT handler with same validation  [write_file]
+  Step 4: Write test for PUT validation                   [write_file]
+  Step 5: Run test suite                                  [execute_shell]
+
+[plan] Executing...
+
+<steps execute successfully — 5/5 completed, all tests pass>
+
+[plan] Plan completed: 5/5 steps succeeded
+
+{
+  "answer": "Added input validation to PUT /tasks/:id with the same rules as POST (title must be non-empty, under 200 chars). Reused the validation pattern from the earlier POST implementation. All tests pass.",
+  "confidence": 0.95,
+  "sources": ["src/routes/tasks.pseudo", "tests/validation_test.pseudo"]
+}
+
+NOTE: Strategy reuse:
+  1. Agent found a PRIOR strategy for "add validation" tasks
+  2. Used that strategy as the starting decomposition template
+  3. Adapted step 2 to reference existing validation (not search for patterns)
+  4. Same 5-step pattern, successful again
+
+================================================================================
+SESSION 4: SIMPLE TASK — NO PLAN NEEDED
+================================================================================
+
+$ tbh-code --codebase ./todo-api --ask "What files are in the src/ directory?"
+
+[session: j1k2l3]
+
+[plan] Task complexity: simple (single tool call expected)
+[plan] Skipping decomposition — executing directly
+
+[tool] Agent selected: list_files
+[tool] Arguments: { "path": "src/", "recursive": true }
+[tool] Result: success=true
+
+{
+  "answer": "The src/ directory contains:\n- main.pseudo (entry point)\n- routes/tasks.pseudo (task CRUD routes)\n- routes/auth.pseudo (auth routes)\n- middleware/auth.pseudo (auth middleware)\n- middleware/rate_limiter.pseudo (rate limiting)\n- models/task.pseudo (Task model)\n- models/user.pseudo (User model)\n- db.pseudo (database layer)",
+  "confidence": 1.0,
+  "sources": ["src/"]
+}
+
+NOTE: Not everything needs a plan:
+  1. Agent recognized this as a simple, single-tool task
+  2. Skipped decomposition entirely — direct execution
+  3. Planning adds overhead — only use it for multi-step tasks
+
+================================================================================
+KEY OBSERVATIONS FOR THE READER
+================================================================================
+
+1. DECOMPOSITION — complex tasks become ordered, manageable steps
+2. CHAIN-OF-THOUGHT — [think] traces make reasoning visible before every step
+3. RESULT FLOW — later steps use results from earlier steps
+4. REPLAN ON FAILURE — agent adapts the plan instead of crashing
+5. STRATEGY TRACKING — successful approaches are logged for reuse
+6. STRATEGY REUSE — prior strategies inform future decomposition
+7. SMART PLANNING — simple tasks skip decomposition (no over-planning)
+8. The bridge to Ch 8: the agent plans and executes, but doesn't evaluate output quality — it says "done" without checking its own work

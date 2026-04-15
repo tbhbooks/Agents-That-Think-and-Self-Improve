@@ -1,0 +1,369 @@
+================================================================================
+CHAPTER 11 — EXPECTED OUTPUT
+================================================================================
+
+SETUP:
+  Four agents: coder, reviewer, runner, researcher.
+  Each runs as a separate process pointed at the same codebase.
+  Broadcast bus directory: .tbh-code/bus/
+  All Ch 1-10 capabilities active: tools, skills, memory, planning,
+  evaluation, guardrails, self-improvement, agent identity.
+
+================================================================================
+SESSION 1: BROADCAST BUS — AGENT ANNOUNCES ITSELF
+================================================================================
+
+$ tbh-code --agent coder --codebase ./todo-api
+
+[coder] Starting agent: coder v1.0.0
+[coder] Subscribing to broadcast bus: .tbh-code/bus/
+[coder] Publishing agent card...
+
+$ ls .tbh-code/bus/
+2025-01-20T10:00:01Z-coder-announce.json
+
+$ cat .tbh-code/bus/2025-01-20T10:00:01Z-coder-announce.json
+{
+  "type": "announce",
+  "sender": "coder",
+  "payload": {
+    "name": "coder",
+    "description": "Reads and writes code. Applies edits, implements features, fixes bugs.",
+    "version": "1.0.0",
+    "capabilities": ["read_file", "write_file", "search_code", "apply_diff"],
+    "skills": [
+      { "name": "find-bug", "version": 2, "description": "Locate and fix bugs with security awareness" },
+      { "name": "implement-feature", "version": 1, "description": "Add new functionality to existing codebase" }
+    ],
+    "connection": {
+      "protocol": "file",
+      "address": ".tbh-code/agents/coder/inbox/"
+    },
+    "status": "available",
+    "announced_at": "2025-01-20T10:00:01Z"
+  },
+  "timestamp": "2025-01-20T10:00:01Z",
+  "message_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+}
+
+[coder] Peer registry: 0 peers
+
+NOTE: Single agent on the bus:
+  1. Agent card written as a JSON file to the shared bus directory
+  2. Filename encodes timestamp, sender, and message type
+  3. The card includes capabilities, skills, connection info, and status
+  4. No peers discovered yet — coder is the first agent
+
+================================================================================
+SESSION 2: PEER DISCOVERY — FOUR AGENTS FIND EACH OTHER
+================================================================================
+
+$ tbh-code --agent coder --codebase ./todo-api &
+$ tbh-code --agent reviewer --codebase ./todo-api &
+$ tbh-code --agent runner --codebase ./todo-api &
+$ tbh-code --agent researcher --codebase ./todo-api &
+
+[coder] Starting agent: coder v1.0.0
+[coder] Subscribing to broadcast bus: .tbh-code/bus/
+[coder] Publishing agent card...
+[coder] Discovered peer: reviewer (capabilities: read_file, search_code, evaluate_code)
+[coder] Discovered peer: runner (capabilities: run_command, run_tests)
+[coder] Discovered peer: researcher (capabilities: read_file, search_code, search_docs)
+[coder] Peer registry: 3 peers
+
+[reviewer] Starting agent: reviewer v1.0.0
+[reviewer] Subscribing to broadcast bus: .tbh-code/bus/
+[reviewer] Publishing agent card...
+[reviewer] Discovered peer: coder (capabilities: read_file, write_file, search_code, apply_diff)
+[reviewer] Discovered peer: runner (capabilities: run_command, run_tests)
+[reviewer] Discovered peer: researcher (capabilities: read_file, search_code, search_docs)
+[reviewer] Peer registry: 3 peers
+
+[runner] Starting agent: runner v1.0.0
+[runner] Subscribing to broadcast bus: .tbh-code/bus/
+[runner] Publishing agent card...
+[runner] Discovered peer: coder (capabilities: read_file, write_file, search_code, apply_diff)
+[runner] Discovered peer: reviewer (capabilities: read_file, search_code, evaluate_code)
+[runner] Discovered peer: researcher (capabilities: read_file, search_code, search_docs)
+[runner] Peer registry: 3 peers
+
+[researcher] Starting agent: researcher v1.0.0
+[researcher] Subscribing to broadcast bus: .tbh-code/bus/
+[researcher] Publishing agent card...
+[researcher] Discovered peer: coder (capabilities: read_file, write_file, search_code, apply_diff)
+[researcher] Discovered peer: reviewer (capabilities: read_file, search_code, evaluate_code)
+[researcher] Discovered peer: runner (capabilities: run_command, run_tests)
+[researcher] Peer registry: 3 peers
+
+$ ls .tbh-code/bus/
+2025-01-20T10:00:01Z-coder-announce.json
+2025-01-20T10:00:01Z-reviewer-announce.json
+2025-01-20T10:00:02Z-runner-announce.json
+2025-01-20T10:00:02Z-researcher-announce.json
+
+NOTE: Discovery protocol in action:
+  1. Each agent subscribes, announces, and reads existing messages
+  2. Order doesn't matter — read_existing catches agents that started first
+  3. 4 announcements × 3 peers each = 12 discovery events total
+  4. Every agent knows every other agent's name, capabilities, and skills
+  5. The bus directory is the entire state of the swarm — debuggable with ls
+
+================================================================================
+SESSION 3: SKILL SHARING — REVIEWER SHARES "SECURITY-REVIEW" SKILL
+================================================================================
+
+[reviewer] Sharing skill: security-review v1
+[reviewer] Publishing to broadcast bus...
+
+$ cat .tbh-code/bus/2025-01-20T10:00:05Z-reviewer-skill_share.json
+{
+  "type": "skill_share",
+  "sender": "reviewer",
+  "payload": {
+    "skill": {
+      "name": "security-review",
+      "description": "Check code for common security vulnerabilities",
+      "steps": [
+        { "action": "read_file", "description": "Read the target file" },
+        { "action": "search_code", "description": "Search for security anti-patterns (eval, exec, SQL concat, plaintext)" },
+        { "action": "evaluate_code", "description": "Evaluate each finding for severity and exploitability" },
+        { "action": "search_code", "description": "Check for missing input validation on user-facing endpoints" }
+      ],
+      "tools_used": ["read_file", "search_code", "evaluate_code"],
+      "version": 1
+    },
+    "origin": "reviewer",
+    "context": "Sharing skill that may be useful to peers"
+  },
+  "timestamp": "2025-01-20T10:00:05Z",
+  "message_id": "b2c3d4e5-f6a7-8901-bcde-f23456789012"
+}
+
+[coder] Received skill_share from reviewer: security-review v1
+[coder] Checking tool compatibility...
+[coder] Required tools: [read_file, search_code, evaluate_code]
+[coder] My tools: [read_file, write_file, search_code, apply_diff]
+[coder] Missing tools: [evaluate_code]
+[coder] Skipping skill security-review — missing tools: [evaluate_code]
+
+[runner] Received skill_share from reviewer: security-review v1
+[runner] Checking tool compatibility...
+[runner] Required tools: [read_file, search_code, evaluate_code]
+[runner] My tools: [run_command, run_tests]
+[runner] Missing tools: [read_file, search_code, evaluate_code]
+[runner] Skipping skill security-review — missing tools: [read_file, search_code, evaluate_code]
+
+[researcher] Received skill_share from reviewer: security-review v1
+[researcher] Checking tool compatibility...
+[researcher] Required tools: [read_file, search_code, evaluate_code]
+[researcher] My tools: [read_file, search_code, search_docs]
+[researcher] Missing tools: [evaluate_code]
+[researcher] Skipping skill security-review — missing tools: [evaluate_code]
+
+NOTE: Skill sharing with tool compatibility:
+  1. Reviewer broadcasts the full skill spec (not just a summary)
+  2. Each peer checks whether it has ALL required tools
+  3. Nobody adopted this skill — evaluate_code is a reviewer-only capability
+  4. This is correct behavior: skills don't spread where they can't execute
+  5. If Coder had evaluate_code, it would adopt the skill
+
+--- SECOND SHARE: A SKILL THAT CODER CAN USE ---
+
+[reviewer] Sharing skill: refactor-safely v1
+[reviewer] Publishing to broadcast bus...
+
+[coder] Received skill_share from reviewer: refactor-safely v1
+[coder] Checking tool compatibility...
+[coder] Required tools: [read_file, search_code, apply_diff]
+[coder] My tools: [read_file, write_file, search_code, apply_diff]
+[coder] Compatible: all required tools available
+[coder] Adopted skill: refactor-safely v1 (from reviewer)
+[coder] Skill added to local skill set
+
+[runner] Received skill_share from reviewer: refactor-safely v1
+[runner] Missing tools: [read_file, search_code, apply_diff]
+[runner] Skipping skill refactor-safely — missing tools: [read_file, search_code, apply_diff]
+
+[researcher] Received skill_share from reviewer: refactor-safely v1
+[researcher] Missing tools: [apply_diff]
+[researcher] Skipping skill refactor-safely — missing tools: [apply_diff]
+
+NOTE: Selective adoption:
+  1. Coder adopted refactor-safely — it has read_file, search_code, and apply_diff
+  2. Runner and Researcher skipped it — they lack required tools
+  3. Skill adoption is never blind — tool compatibility is checked first
+
+================================================================================
+SESSION 4: CAPABILITY-BASED LOOKUP — FIND AGENTS THAT CAN RUN TESTS
+================================================================================
+
+[coder] Querying peer registry: who can run tests?
+
+# registry.get_peers_with_capability("run_tests")
+[coder] Peers with capability "run_tests": [runner]
+
+# registry.get_peers_with_capability("evaluate_code")
+[coder] Peers with capability "evaluate_code": [reviewer]
+
+# registry.get_peers_with_capability("read_file")
+[coder] Peers with capability "read_file": [reviewer, researcher]
+
+# registry.get_peers_with_skill("code-review")
+[coder] Peers with skill "code-review": [reviewer]
+
+# registry.get_peers_with_skill("find-context")
+[coder] Peers with skill "find-context": [researcher]
+
+# registry.get_peer("runner")
+[coder] Peer "runner":
+  {
+    "name": "runner",
+    "description": "Runs commands and tests. Reports results.",
+    "version": "1.0.0",
+    "capabilities": ["run_command", "run_tests"],
+    "skills": [
+      { "name": "test-suite", "version": 1, "description": "Run and report test results" }
+    ],
+    "connection": {
+      "protocol": "file",
+      "address": ".tbh-code/agents/runner/inbox/"
+    },
+    "status": "available",
+    "announced_at": "2025-01-20T10:00:02Z"
+  }
+
+NOTE: The peer registry is a queryable index:
+  1. Query by capability: "who can run_tests?" → [runner]
+  2. Query by skill: "who has code-review?" → [reviewer]
+  3. Query by name: get the full card with connection info
+  4. This is the address book — Coder knows WHERE runner is and WHAT it can do
+  5. But it can't SEND a message yet — that's Ch 12
+
+================================================================================
+SESSION 5: AGENT WITHDRAWAL — AGENT GOES OFFLINE
+================================================================================
+
+[coder] Shutting down...
+[coder] Publishing withdrawal...
+
+$ cat .tbh-code/bus/2025-01-20T10:05:00Z-coder-withdraw.json
+{
+  "type": "withdraw",
+  "sender": "coder",
+  "payload": {
+    "reason": "clean shutdown"
+  },
+  "timestamp": "2025-01-20T10:05:00Z",
+  "message_id": "c3d4e5f6-a7b8-9012-cdef-345678901234"
+}
+
+[reviewer] Peer withdrawn: coder
+[reviewer] Removing coder from peer registry
+[reviewer] Peer registry: 2 peers (runner, researcher)
+
+[runner] Peer withdrawn: coder
+[runner] Removing coder from peer registry
+[runner] Peer registry: 2 peers (reviewer, researcher)
+
+[researcher] Peer withdrawn: coder
+[researcher] Removing coder from peer registry
+[researcher] Peer registry: 2 peers (reviewer, runner)
+
+[coder] Shutdown complete
+
+NOTE: Graceful withdrawal:
+  1. Coder publishes a withdraw message before disconnecting
+  2. All peers remove Coder from their registry
+  3. Peer count drops from 3 to 2 for each remaining agent
+  4. The withdraw message persists in the bus directory (for debugging)
+  5. If Coder crashed without withdrawing, lazy cleanup in Ch 12 handles it
+
+================================================================================
+SESSION 6: IMPROVEMENT BROADCAST — VERIFIED IMPROVEMENT SHARED
+================================================================================
+
+[coder] Skill find-bug refined: v1 → v2
+[coder] Refinement reason: "2 security mistakes (timing attack, plaintext passwords).
+        Added security check step and cross-file search."
+[coder] Verification: passed (0.72 → 0.85)
+[coder] Broadcasting improvement...
+
+$ cat .tbh-code/bus/2025-01-20T10:10:00Z-coder-improvement.json
+{
+  "type": "improvement",
+  "sender": "coder",
+  "payload": {
+    "skill": {
+      "name": "find-bug",
+      "description": "Locate and fix bugs with security awareness",
+      "steps": [
+        { "action": "search_code", "description": "Search for code related to the symptom" },
+        { "action": "read_file", "description": "Read the most relevant file" },
+        { "action": "search_code", "description": "Search for related tests" },
+        { "action": "read_file", "description": "Read the test file if found" },
+        { "action": "search_code", "description": "Check for similar patterns in other files" },
+        { "action": "evaluate", "description": "Verify fix doesn't use insecure patterns" }
+      ],
+      "tools_used": ["search_code", "read_file"],
+      "version": 2,
+      "parent_version": 1,
+      "refinement_reason": "2 security mistakes (timing attack, plaintext passwords). Added security check step and cross-file search."
+    },
+    "parent_version": 1,
+    "refinement_reason": "2 security mistakes (timing attack, plaintext passwords). Added security check step and cross-file search.",
+    "journal_categories": ["security"],
+    "verified": true
+  },
+  "timestamp": "2025-01-20T10:10:00Z",
+  "message_id": "d4e5f6a7-b8c9-0123-defa-456789012345"
+}
+
+[reviewer] Received improvement from coder: find-bug v1 → v2
+[reviewer] Refinement reason: "2 security mistakes — added security check step"
+[reviewer] Verified by coder: yes (score improved 0.72 → 0.85)
+[reviewer] Evaluating adoption...
+[reviewer] Current find-bug version: v1
+[reviewer] Improvement is verified and addresses known category: security
+[reviewer] Tool check: required [search_code, read_file] — all available
+[reviewer] Adopting find-bug v2 (from coder)
+[reviewer] Updated skill: find-bug v1 → v2
+
+[runner] Received improvement from coder: find-bug v1 → v2
+[runner] find-bug not in skill set — skipping
+
+[researcher] Received improvement from coder: find-bug v1 → v2
+[researcher] find-bug not in skill set — skipping
+
+--- UNVERIFIED IMPROVEMENT (REJECTED) ---
+
+[coder] Skill quick-fix refined: v1 → v2
+[coder] Verification: SKIPPED
+[coder] Broadcasting improvement...
+
+[reviewer] Received improvement from coder: quick-fix v1 → v2
+[reviewer] Skipping unverified improvement: quick-fix
+[reviewer] Unverified improvements do not propagate.
+
+NOTE: Improvement sharing with trust:
+  1. Coder refined find-bug based on its mistake journal (Ch 9)
+  2. The improvement was VERIFIED — before/after metrics showed real gain
+  3. Reviewer adopted it — it has the skill and the required tools
+  4. Runner and Researcher skipped — they don't have find-bug
+  5. The unverified quick-fix improvement was REJECTED by all peers
+  6. Verification is the trust signal: no verification, no propagation
+
+================================================================================
+KEY OBSERVATIONS FOR THE READER
+================================================================================
+
+1. BROADCAST BUS — file-based pub/sub, debuggable with ls and cat
+2. AGENT CARDS — structured self-descriptions with capabilities AND skills
+3. DISCOVERY PROTOCOL — subscribe + announce + read history (three steps)
+4. PEER REGISTRY — queryable index: by name, capability, or skill
+5. SKILL SHARING — skills spread only to tool-compatible agents
+6. IMPROVEMENT SHARING — improvements propagate only when verified
+7. WITHDRAWAL — clean shutdown removes from all peer registries
+8. NO CENTRAL REGISTRY — each agent maintains its own peer list
+9. IDEMPOTENT — re-announcing updates the existing entry, doesn't duplicate
+10. The bridge to Ch 12: agents know WHO is out there, but can't TALK yet.
+    Discovery is the address book. Communication is the conversation.

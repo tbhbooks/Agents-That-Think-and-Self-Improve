@@ -1,0 +1,604 @@
+================================================================================
+CHAPTER 13 — EXPECTED OUTPUT
+================================================================================
+
+SETUP:
+  Agent swarm running with 4 agents: Coder, Reviewer, Runner, Security Auditor.
+  All prior capabilities active: tools, skills, memory, planning, evaluation,
+  guardrails, self-improvement, agent identity, discovery, messaging.
+  Broadcast bus from Ch 11 active.
+  Direct messaging from Ch 12 active.
+  Swarm patterns: orchestrator-workers, fan-out/fan-in, review chains, consensus,
+  conflict resolution, backpressure, collective learning.
+
+================================================================================
+SESSION 0: ORCHESTRATOR-WORKERS — CENTRALIZED DECOMPOSE/DISPATCH/COLLECT
+================================================================================
+
+$ tbh-code --orchestrator --task "Add a DELETE /tasks/:id endpoint to todo-api"
+
+[orchestrator] Received task: "Add a DELETE /tasks/:id endpoint to todo-api"
+[orchestrator] Decomposing into subtasks...
+
+[orchestrator] Plan:
+  Step 1: researcher — "Gather context on existing task routes and data model"
+  Step 2: coder     — "Write DELETE /tasks/:id endpoint with auth and validation"
+  Step 3: reviewer  — "Review the new endpoint code"
+  Step 4: runner    — "Run the test suite"
+
+[orchestrator] Dispatching Step 1 → researcher
+[orchestrator] → msg-201 [request] to researcher (correlation: orch-001)
+               action: gather_context
+               payload: { focus: "task routes, data model, auth middleware" }
+
+[researcher] ← msg-201 [request] from orchestrator
+[researcher] Reading src/routes/tasks.pseudo, src/models/task.pseudo...
+[researcher] → msg-202 [response] to orchestrator (correlation: orch-001)
+  {
+    "routes": ["GET /tasks", "POST /tasks", "PUT /tasks/:id"],
+    "model": { "fields": ["id", "title", "user_id", "completed"] },
+    "auth": "Token-based, ownership check via req.user.id"
+  }
+
+[orchestrator] Step 1 complete (3.2s). Dispatching Step 2 → coder
+[orchestrator] → msg-203 [request] to coder (correlation: orch-001)
+               action: write_code
+               payload: { task: "Write DELETE /tasks/:id", context: <researcher report> }
+
+[coder] ← msg-203 [request] from orchestrator
+[coder] Writing DELETE endpoint with ownership check...
+[coder] → msg-204 [response] to orchestrator (correlation: orch-001)
+  {
+    "files_changed": ["src/routes/tasks.pseudo"],
+    "diff": "+function delete_task(req, res): ..."
+  }
+
+[orchestrator] Step 2 complete (5.1s). Dispatching Step 3 → reviewer
+[orchestrator] → msg-205 [request] to reviewer (correlation: orch-001)
+               action: review_code
+               payload: { diff: <coder's diff>, context: <researcher report> }
+
+[reviewer] ← msg-205 [request] from orchestrator
+[reviewer] Reading diff... checking ownership logic...
+[reviewer] → msg-206 [response] to orchestrator (correlation: orch-001)
+  {
+    "verdict": "approve_with_comments",
+    "findings": [
+      { "severity": "info", "comment": "Ownership check present — good" },
+      { "severity": "low", "comment": "Consider returning deleted task ID in response" }
+    ]
+  }
+
+[orchestrator] Step 3 complete (4.8s). Dispatching Step 4 → runner
+[orchestrator] → msg-207 [request] to runner (correlation: orch-001)
+               action: run_tests
+               payload: { test_path: "tests/", focus: "tasks" }
+
+[runner] ← msg-207 [request] from orchestrator
+[runner] Running tests...
+[runner] → msg-208 [response] to orchestrator (correlation: orch-001)
+  {
+    "passed": 7,
+    "failed": 0,
+    "summary": "All tests pass, including new delete_task tests"
+  }
+
+[orchestrator] Step 4 complete (8.4s). All steps done.
+[orchestrator] Synthesizing results...
+
+[orchestrator] Result:
+  {
+    "task": "Add DELETE /tasks/:id endpoint to todo-api",
+    "dispatches": [
+      { "step": "Gather context", "assigned_to": "researcher", "status": "complete" },
+      { "step": "Write endpoint", "assigned_to": "coder", "status": "complete" },
+      { "step": "Review code", "assigned_to": "reviewer", "status": "complete" },
+      { "step": "Run tests", "assigned_to": "runner", "status": "complete" }
+    ],
+    "final_output": {
+      "code_approved": true,
+      "tests_passing": true,
+      "review_verdict": "approve_with_comments",
+      "non_blocking_comments": 1
+    },
+    "total_time": 21.5
+  }
+
+NOTE: Orchestrator observations:
+  1. Clean sequential flow: decompose → dispatch → collect → synthesize
+  2. Every message flows through the orchestrator (star topology)
+  3. Total time = sum of all steps (3.2 + 5.1 + 4.8 + 8.4 = 21.5s) — no parallelism
+  4. Orchestrator knows every agent and every interaction
+
+================================================================================
+SESSION 0b: ORCHESTRATOR BREAKS — NEW AGENT + CRASH MID-TASK
+================================================================================
+
+--- Break 1: New agent not recognized ---
+
+[broadcast] New agent announced: security-auditor
+  capabilities: ["vulnerability_scan", "dependency_audit", "security_review"]
+
+$ tbh-code --orchestrator --task "Add a DELETE /tasks/:id endpoint to todo-api"
+
+[orchestrator] Decomposing into subtasks...
+[orchestrator] Plan:
+  Step 1: researcher — "Gather context"
+  Step 2: coder     — "Write endpoint"
+  Step 3: reviewer  — "Review code"
+  Step 4: runner    — "Run tests"
+
+  ⚠ security-auditor is in the peer registry but NOT in the plan.
+  ⚠ No security audit step. decompose() doesn't know about the new agent.
+  ⚠ To include security-auditor, YOU must update the orchestrator.
+
+[orchestrator] Result:
+  {
+    "task": "Add DELETE /tasks/:id endpoint to todo-api",
+    "dispatches": [
+      { "step": "Gather context", "assigned_to": "researcher", "status": "complete" },
+      { "step": "Write endpoint", "assigned_to": "coder", "status": "complete" },
+      { "step": "Review code", "assigned_to": "reviewer", "status": "complete" },
+      { "step": "Run tests", "assigned_to": "runner", "status": "complete" }
+    ],
+    "final_output": { "code_approved": true, "tests_passing": true },
+    "total_time": 22.1
+  }
+
+  ⚠ No security scan performed. Vulnerability shipped.
+
+--- Break 2: Orchestrator crashes mid-task ---
+
+$ tbh-code --orchestrator --task "Refactor error handling in todo-api"
+
+[orchestrator] Decomposing into subtasks...
+[orchestrator] Plan: researcher → coder → reviewer → runner
+
+[orchestrator] Step 1 complete (3.0s). Dispatching Step 2 → coder
+[coder] Writing refactored error handling...
+[coder] → msg-210 [response] to orchestrator
+
+[orchestrator] Step 2 complete (6.2s). Dispatching Step 3 → reviewer
+
+[orchestrator] CRASH — process killed
+
+[reviewer] ← msg-211 [request] from orchestrator
+[reviewer] Completed review. Sending response...
+[reviewer] → msg-212 [response] to orchestrator
+[reviewer] ... orchestrator not responding ...
+[reviewer] ERROR: response delivery failed
+
+[runner] Idle. No instructions received.
+[coder] Work complete. No acknowledgment.
+
+  → Restart orchestrator
+  → Task starts from scratch
+  → Coder's work is repeated
+  → Reviewer's completed review is lost
+
+NOTE: Orchestrator failure modes:
+  1. New agent problem: decompose() doesn't automatically include new agents
+  2. Bottleneck: all messages relay through orchestrator (4 hops instead of 1)
+  3. Single point of failure: crash = total task loss, no agent can resume
+  4. These are structural — not bugs to fix, but ceilings to outgrow
+
+================================================================================
+SESSION 1: FAN-OUT/FAN-IN — PARALLEL WORK, MERGED RESULTS
+================================================================================
+
+$ tbh-code --swarm --task "Add a DELETE /tasks/:id endpoint to todo-api"
+
+[coder] Planning implementation for DELETE /tasks/:id
+[coder] Writing endpoint: src/routes/tasks.pseudo
+[coder] Publishing event: code_ready
+  {
+    "id": "evt-001",
+    "type": "code_ready",
+    "source": "coder",
+    "correlation_id": "task-001",
+    "payload": {
+      "files_changed": ["src/routes/tasks.pseudo"],
+      "diff": "... +function delete_task(req, res): ..."
+    },
+    "timestamp": "2025-02-01T10:00:00Z",
+    "requires_response": true,
+    "response_deadline": "2025-02-01T10:00:30Z"
+  }
+
+[fan-out] Event code_ready → 3 subscribers: reviewer, runner, security-auditor
+[fan-out] Starting parallel processing...
+
+[reviewer] Received code_ready (task-001)
+[reviewer] Reading diff... analyzing quality...
+[runner] Received code_ready (task-001)
+[runner] Running tests against modified codebase...
+[security-auditor] Received code_ready (task-001)
+[security-auditor] Scanning for vulnerabilities...
+
+[reviewer] Publishing review_complete (12.3s)
+  {
+    "type": "review_complete",
+    "source": "reviewer",
+    "correlation_id": "task-001",
+    "payload": {
+      "approved": false,
+      "issues": [
+        "Missing authorization check — any user can delete any task",
+        "No input validation on :id parameter"
+      ],
+      "severity": "high"
+    }
+  }
+
+[fan-in] Received 1 of 3 responses (reviewer)
+
+[security-auditor] Publishing audit_complete (15.1s)
+  {
+    "type": "audit_complete",
+    "source": "security-auditor",
+    "correlation_id": "task-001",
+    "payload": {
+      "vulnerabilities": [
+        {
+          "type": "broken-access-control",
+          "detail": "No ownership check — DELETE deletes any user's task",
+          "severity": "critical"
+        }
+      ]
+    }
+  }
+
+[fan-in] Received 2 of 3 responses (reviewer, security-auditor)
+
+[runner] Publishing tests_complete (18.7s)
+  {
+    "type": "tests_complete",
+    "source": "runner",
+    "correlation_id": "task-001",
+    "payload": {
+      "passed": 4,
+      "failed": 1,
+      "failures": ["test_delete_nonexistent_task: expected 404, got 500"]
+    }
+  }
+
+[fan-in] All 3 responses received for task-001 (18.7s total)
+[fan-in] Merging results...
+
+[fan-in] Merged feedback for task-001:
+  {
+    "responses": {
+      "reviewer": { "approved": false, "issues": ["Missing authorization check", "No input validation on :id"] },
+      "runner": { "passed": 4, "failed": 1, "failures": ["test_delete_nonexistent_task: expected 404, got 500"] },
+      "security-auditor": { "vulnerabilities": ["Broken access control — no ownership check"] }
+    },
+    "missing": [],
+    "warnings": [],
+    "complete": true
+  }
+
+[coder] Received merged feedback for task-001
+[coder] Addressing 3 issues...
+
+NOTE: Fan-out timing:
+  Sequential would be: 12.3 + 15.1 + 18.7 = 46.1s
+  Fan-out actual:      max(12.3, 15.1, 18.7) = 18.7s
+  Speedup: 60% faster
+
+================================================================================
+SESSION 2: REVIEW CHAIN — SEQUENTIAL ROUTING DECISIONS
+================================================================================
+
+$ tbh-code --swarm --task "Refactor the error handling in todo-api routes"
+
+[coder] Writing refactored error handling...
+[coder] Publishing: code_ready (task-002)
+
+--- Reviewer decides: push back ---
+
+[reviewer] Received code_ready (task-002)
+[reviewer] Reading diff... analyzing quality...
+[reviewer] Issues found: error handler catches all exceptions — should be specific
+[reviewer] RouteDecision:
+  {
+    "action": "push_back",
+    "target": "coder",
+    "reason": "Generic catch-all exception handler — use specific exception types",
+    "payload": {
+      "issues": ["Catching Exception instead of specific types", "Missing error context in log messages"],
+      "severity": "high"
+    }
+  }
+
+[coder] Received push_back from reviewer
+[coder] Fixing: specific exception types, adding error context...
+[coder] Publishing: code_ready (task-002, revision 2)
+
+--- Reviewer decides: pass forward ---
+
+[reviewer] Received code_ready (task-002, rev 2)
+[reviewer] Reading revised diff... changes look good.
+[reviewer] RouteDecision:
+  {
+    "action": "pass_forward",
+    "target": "runner",
+    "reason": "Code approved — specific exception handling, good error context. Ready for testing.",
+    "payload": {
+      "approved": true,
+      "issues": []
+    }
+  }
+
+--- Runner decides: done ---
+
+[runner] Received review_approved (task-002)
+[runner] Running tests...
+[runner] All 8 tests passed.
+[runner] RouteDecision:
+  {
+    "action": "done",
+    "target": "coder",
+    "reason": "All tests passed — refactoring complete",
+    "payload": {
+      "passed": 8,
+      "failed": 0
+    }
+  }
+
+[coder] Review chain complete for task-002:
+  Coder → Reviewer (push back) → Coder (fix) → Reviewer (pass forward) → Runner (done)
+  Total: 2 review rounds, 0 test failures
+
+NOTE: Review chain observations:
+  1. The chain emerged from individual decisions, not a predefined flow
+  2. Reviewer CHOSE to push back (critical issues), then CHOSE to pass forward (fixed)
+  3. Runner CHOSE to report done (all tests passed)
+  4. Nobody told them the order — the order was a consequence of the content
+
+================================================================================
+SESSION 3: CONSENSUS — WEIGHTED VOTING ON SECURITY DECISION
+================================================================================
+
+$ tbh-code --swarm --task "Prioritize next work: refactor create_task or fix SQL injection"
+
+[consensus] Decision: "What should Coder work on next?"
+[consensus] Options:
+  A: "Refactor create_task for clean architecture"
+  B: "Fix SQL injection in find_tasks_by_user"
+[consensus] Decision type: security (vulnerability involved)
+[consensus] Using security-weighted voting
+[consensus] Voters:
+  reviewer:         weight 1.0 (required: false)
+  security-auditor: weight 3.0 (required: true)
+  runner:           weight 1.0 (required: false)
+
+[consensus] Requesting votes...
+
+[reviewer] Vote: A
+  Reasoning: "Architecture debt is growing. create_task is becoming unmaintainable."
+  Weight: 1.0
+
+[security-auditor] Vote: B
+  Reasoning: "Live vulnerability. SQL injection in find_tasks_by_user can be exploited right now. Fix immediately."
+  Weight: 3.0
+
+[runner] Vote: B
+  Reasoning: "SQL injection could corrupt test data. Unreliable test results until fixed."
+  Weight: 1.0
+
+[consensus] Tally:
+  Option A: 1.0 (reviewer)
+  Option B: 4.0 (security-auditor + runner)
+
+[consensus] Result:
+  {
+    "chosen": "B — Fix SQL injection in find_tasks_by_user",
+    "votes": [
+      { "agent": "reviewer", "choice": "A", "weight": 1.0, "reasoning": "Architecture debt is growing" },
+      { "agent": "security-auditor", "choice": "B", "weight": 3.0, "reasoning": "Live vulnerability, fix immediately" },
+      { "agent": "runner", "choice": "B", "weight": 1.0, "reasoning": "Injection could corrupt test data" }
+    ],
+    "margin": 3.0,
+    "unanimous": false
+  }
+
+[coder] Consensus reached: fixing SQL injection first.
+[coder] Dissent noted: reviewer preferred A (architecture debt).
+
+NOTE: Consensus observations:
+  1. Security Auditor's 3.0 weight dominated the security decision
+  2. Reviewer's dissent is preserved — not overruled silently
+  3. If this were an ARCHITECTURE decision, reviewer would have weight 3.0
+  4. Required voter (security-auditor) had to vote for consensus to be valid
+
+================================================================================
+SESSION 4: CONFLICT RESOLUTION — EVIDENCE-BASED RESOLUTION
+================================================================================
+
+$ tbh-code --swarm --task "Verify the ownership check in delete_task"
+
+[conflict] Contradiction detected (task-003):
+  reviewer: "delete_task has no ownership check"
+  runner: "all tests pass including ownership tests"
+
+[conflict] Strategy: request_evidence
+
+[conflict] → reviewer: "Provide the specific lines where ownership check is missing"
+[reviewer] Evidence:
+  {
+    "claim": "No ownership check in delete_task",
+    "file": "src/routes/tasks.pseudo",
+    "lines": "42-48",
+    "detail": "Function deletes WHERE id = :id. No WHERE user_id = req.user.id"
+  }
+
+[conflict] → runner: "Provide the ownership test that passed"
+[runner] Evidence:
+  {
+    "claim": "Ownership test passes",
+    "file": "tests/tasks_test.pseudo",
+    "lines": "87-95",
+    "detail": "test_delete_task_ownership: creates task as user 1, deletes as user 1. Passes — but never tests cross-user deletion."
+  }
+
+[conflict] Evaluating evidence...
+
+[conflict] Resolution:
+  {
+    "strategy": "request_evidence",
+    "conflict": {
+      "claims": {
+        "reviewer": "delete_task has no ownership check",
+        "runner": "all tests pass including ownership tests"
+      },
+      "type": "correctness"
+    },
+    "resolution": "reviewer_correct — test only checks same-user deletion, not cross-user. Missing ownership check is a real bug. Test is passing for the wrong reason.",
+    "evidence": {
+      "reviewer": { "file": "src/routes/tasks.pseudo", "lines": "42-48" },
+      "runner": { "file": "tests/tasks_test.pseudo", "lines": "87-95" }
+    },
+    "decided_by": "evidence"
+  }
+
+[coder] Conflict resolved: ownership check IS missing. Test was incomplete.
+[coder] Action: add ownership check AND fix the test to cover cross-user deletion.
+
+NOTE: Conflict resolution observations:
+  1. Evidence turned a he-said-she-said into a concrete diagnosis
+  2. Both agents were technically right — the test passed but didn't test the right thing
+  3. Resolution is actionable: fix the code AND the test
+  4. No human needed — evidence was sufficient
+
+================================================================================
+SESSION 5: BACKPRESSURE — AGENT REJECTS WORK WHEN QUEUE FULL
+================================================================================
+
+$ tbh-code --swarm --task "Run tests for task-005 (runner overloaded)"
+
+[runner] Processing: task-001 (running tests...)
+[runner] Queue: task-002, task-003, task-004
+[runner] Queue depth: 3 of max 3
+
+[runner] Received code_ready for task-005
+[runner] Queue at capacity (3/3)
+[runner] Publishing backpressure signal:
+  {
+    "type": "backpressure",
+    "source": "runner",
+    "queue_depth": 3,
+    "capacity": 3,
+    "estimated_wait": 45.0,
+    "action": "reject"
+  }
+
+[coder] Received backpressure from runner
+[coder] Strategy: wait and retry
+[coder] Will retry task-005 in 45 seconds
+
+... 20 seconds later ...
+
+[runner] task-001 complete. Queue: 2/3
+[runner] Processing task-002...
+
+... 45 seconds later ...
+
+[coder] Retrying task-005 → runner
+[runner] Queue: 1/3. Accepting task-005.
+[runner] Running tests for task-005...
+
+NOTE: Backpressure observations:
+  1. Runner didn't crash or silently drop work
+  2. Runner sent an explicit signal: "I'm full, try again in 45 seconds"
+  3. Coder received the signal and adapted (wait + retry)
+  4. After retry, runner had capacity and accepted the work
+  5. The swarm degraded gracefully instead of failing
+
+================================================================================
+SESSION 6: COLLECTIVE LEARNING — SKILL IMPROVEMENT PROPAGATION
+================================================================================
+
+$ tbh-code --swarm --task "Security auditor improves SQL injection detection"
+
+--- Phase 1: Security Auditor rewrites its own skill ---
+
+[security-auditor] Found new SQL injection pattern: format strings (not just concatenation)
+[security-auditor] Rewriting security-scan skill v1 → v2
+  v1: check for string concatenation in SQL queries
+  v2: check for string concatenation AND format strings in SQL queries
+  Refinement reason: "String concatenation check missed format-string injection patterns"
+
+[security-auditor] Publishing: skill_improved
+  {
+    "type": "skill_improved",
+    "source": "security-auditor",
+    "correlation_id": null,
+    "payload": {
+      "skill": "security-scan",
+      "version": 2,
+      "change": "Added format-string injection check"
+    }
+  }
+
+--- Phase 2: Other agents receive and decide ---
+
+[reviewer] Received skill_improved: security-scan v2
+[reviewer] I do code review. SQL injection detection is relevant to my role.
+[reviewer] Verifying improvement...
+[reviewer] Verification: security-scan v2 catches more injection patterns than v1
+[reviewer] Recommendation: KEEP
+[reviewer] Adopted security-scan v2
+
+[coder] Received skill_improved: security-scan v2
+[coder] I write code. Knowing injection patterns helps me avoid them.
+[coder] Verifying improvement...
+[coder] Verification: v2 provides better defensive coding guidance
+[coder] Recommendation: KEEP
+[coder] Adopted security-scan v2
+
+--- Phase 3: Reviewer improves the shared skill further ---
+
+[reviewer] Two weeks later: found a third pattern — ORM-level injection
+[reviewer] Rewriting security-scan v2 → v3
+  v2: concatenation + format strings
+  v3: concatenation + format strings + ORM injection
+  Refinement reason: "ORM query builders can also be vulnerable to injection"
+
+[reviewer] Publishing: skill_improved (security-scan v3)
+
+--- Phase 4: Original author adopts the improvement ---
+
+[security-auditor] Received skill_improved: security-scan v3 (from reviewer)
+[security-auditor] Reviewer improved MY skill. Checking v3...
+[security-auditor] Verifying improvement...
+[security-auditor] Verification: v3 covers more injection types without false positives
+[security-auditor] Recommendation: KEEP
+[security-auditor] Updated to security-scan v3
+
+[coder] Received skill_improved: security-scan v3
+[coder] Verifying improvement...
+[coder] Recommendation: KEEP
+[coder] Updated to security-scan v3
+
+NOTE: Collective learning observations:
+  1. Security Auditor created v2, shared via broadcast bus
+  2. Reviewer adopted v2, later improved it to v3
+  3. Security Auditor adopted v3 — the improvement bounced between agents
+  4. v3 is better than anything either agent would have produced alone
+  5. Every adoption was VERIFIED before applying (Ch 9 verify_improvement)
+  6. If v3 had degraded security-auditor's performance, it would be rejected
+
+================================================================================
+KEY OBSERVATIONS FOR THE READER
+================================================================================
+
+1. ORCHESTRATOR-WORKERS — clean sequential flow, but a ceiling: bottleneck, fragile, rigid
+2. FAN-OUT/FAN-IN — parallel processing, wall-clock = slowest agent (not sum)
+3. PARTIAL RESULTS — when agents timeout, merge what you have + warnings
+4. REVIEW CHAINS — pipelines emerge from individual routing decisions
+5. CONSENSUS — weighted voting, domain expertise determines weight, dissent preserved
+6. CONFLICT RESOLUTION — evidence first, then expert, then escalate
+7. BACKPRESSURE — explicit capacity signals, requesters adapt, no silent failures
+8. COLLECTIVE LEARNING — improvements propagate, bounce between agents, verified before adoption
+9. ORCHESTRATOR → EVENTS — build the obvious thing, watch it break, replace with emergence
+10. The bridge to Ch 14: the swarm works until an agent crashes, or you lose track of a multi-agent task, or a version upgrade breaks everything

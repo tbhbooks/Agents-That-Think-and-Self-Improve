@@ -1,0 +1,195 @@
+================================================================================
+CHAPTER 3 — EXPECTED OUTPUT
+================================================================================
+
+SETUP:
+  Agent is pointed at the todo-api/ codebase.
+  Three SimpleTools registered: read_file, list_files, search_code.
+  ToolRegistry loaded on startup.
+
+================================================================================
+SESSION 1: LISTING AVAILABLE TOOLS
+================================================================================
+
+$ tbh-code --codebase ./todo-api --list-tools
+
+Available tools (3):
+
+  read_file
+    Read the contents of a file at the given path
+    Parameters: path (string, required)
+
+  list_files
+    List files and directories at the given path
+    Parameters: path (string, optional), recursive (bool, optional)
+
+  search_code
+    Search for a pattern in files across the codebase
+    Parameters: pattern (string, required), path (string, optional),
+                file_pattern (string, optional)
+
+================================================================================
+SESSION 2: SIMPLE TOOL CALL — search_code
+================================================================================
+
+$ tbh-code --codebase ./todo-api --ask "Where is the auth middleware defined?"
+
+Loading codebase from ./todo-api ...
+  Loaded 9 files
+  Registered 3 tools: read_file, list_files, search_code
+
+[tool] Agent selected: search_code
+[tool] Arguments: { "pattern": "auth_middleware", "path": "src/" }
+[tool] Result: success=true
+  [
+    { "file": "src/middleware/auth.pseudo", "line": 8, "content": "function auth_middleware(req, res, next):" },
+    { "file": "src/main.pseudo", "line": 12, "content": "app.use(\"/tasks\", auth_middleware)" }
+  ]
+
+[tool] Agent selected: read_file
+[tool] Arguments: { "path": "src/middleware/auth.pseudo" }
+[tool] Result: success=true
+  <file contents>
+
+{
+  "answer": "The auth middleware is defined in src/middleware/auth.pseudo at line 8. The function auth_middleware(req, res, next) checks for an Authorization header and, if present, sets req.user to a hardcoded value. It is applied to the /tasks routes in src/main.pseudo at line 12.",
+  "confidence": 0.95,
+  "sources": [
+    "src/middleware/auth.pseudo:8",
+    "src/main.pseudo:12"
+  ]
+}
+
+NOTE: Key difference from Ch 2:
+  Ch 2: Agent had file content pre-loaded — it could answer, but couldn't search
+  Ch 3: Agent actively SEARCHED for the function, then READ the file to confirm
+  The tool calls are visible in the trace — the reader sees exactly what happened
+
+================================================================================
+SESSION 3: MCP TOOL DISCOVERY
+================================================================================
+
+$ tbh-code --codebase ./todo-api --mcp-server http://localhost:3001 --list-tools
+
+Connecting to MCP server at http://localhost:3001 ...
+  Discovered 2 tools from MCP server
+
+Available tools (5):
+
+  Local tools:
+    read_file — Read the contents of a file at the given path
+    list_files — List files and directories at the given path
+    search_code — Search for a pattern in files across the codebase
+
+  MCP tools (from http://localhost:3001):
+    query_db — Execute a read-only SQL query against the application database
+    list_tables — List all tables and their columns in the database
+
+NOTE: The agent doesn't distinguish between local and MCP tools when selecting.
+Both implement the same Tool interface. The "Local" vs "MCP" labels are for
+the reader's understanding — the agent just sees 5 tools with schemas.
+
+================================================================================
+SESSION 4: VERIFICATION PASS/FAIL
+================================================================================
+
+--- Verification PASS ---
+
+$ tbh-code --codebase ./todo-api --ask "Does the file src/middleware/auth.pseudo exist?"
+
+[tool] Agent selected: read_file
+[tool] Arguments: { "path": "src/middleware/auth.pseudo" }
+[tool] Result: success=true
+[verify] Cross-check: file exists on disk — PASS
+[verify] Cross-check: content is non-empty — PASS
+
+{
+  "answer": "Yes, src/middleware/auth.pseudo exists. It contains the auth_middleware function that handles authentication for protected routes.",
+  "confidence": 1.0,
+  "sources": ["src/middleware/auth.pseudo"]
+}
+
+--- Verification FAIL ---
+
+$ tbh-code --codebase ./todo-api --ask "Read the file src/services/auth_service.pseudo"
+
+[tool] Agent selected: read_file
+[tool] Arguments: { "path": "src/services/auth_service.pseudo" }
+[tool] Result: success=false, error="File not found: src/services/auth_service.pseudo"
+[verify] File does not exist — FAIL
+
+{
+  "answer": "The file src/services/auth_service.pseudo does not exist in the todo-api codebase. The authentication logic is in src/middleware/auth.pseudo and src/routes/auth.pseudo instead.",
+  "confidence": 0.95,
+  "sources": ["src/middleware/auth.pseudo", "src/routes/auth.pseudo"]
+}
+
+NOTE: The verification caught the non-existent file. The agent recovered by
+suggesting the correct files. Without verification, the agent might have
+hallucinated what the non-existent file contains.
+
+================================================================================
+SESSION 5: FULL TASK — Find all functions that take a User parameter
+================================================================================
+
+$ tbh-code --codebase ./todo-api --ask "Find all functions in todo-api that take a User parameter"
+
+Loading codebase from ./todo-api ...
+  Loaded 9 files
+  Registered 3 tools: read_file, list_files, search_code
+
+[tool] Agent selected: search_code
+[tool] Arguments: { "pattern": "User", "path": "src/" }
+[tool] Result: success=true
+  [
+    { "file": "src/models/user.pseudo", "line": 1, "content": "model User:" },
+    { "file": "src/models/user.pseudo", "line": 8, "content": "function create_user(username: string, password: string) -> User:" },
+    { "file": "src/routes/auth.pseudo", "line": 10, "content": "function register(req, res):" },
+    { "file": "src/routes/auth.pseudo", "line": 27, "content": "    token = base64_encode(user.username)" },
+    { "file": "src/db.pseudo", "line": 15, "content": "function find_user(username: string) -> User | null:" },
+    { "file": "src/db.pseudo", "line": 22, "content": "function save_user(user: User) -> void:" }
+  ]
+
+[tool] Agent selected: read_file
+[tool] Arguments: { "path": "src/models/user.pseudo" }
+[tool] Result: success=true
+  <file contents>
+
+[tool] Agent selected: read_file
+[tool] Arguments: { "path": "src/db.pseudo" }
+[tool] Result: success=true
+  <file contents>
+
+[verify] Cross-check: search results reference real files — PASS
+[verify] Cross-check: read_file confirms function signatures — PASS
+
+{
+  "answer": "I found the following functions that take or return a User parameter:\n\n1. src/models/user.pseudo:8 — create_user(username, password) -> User\n   Creates a new User record.\n\n2. src/db.pseudo:15 — find_user(username) -> User | null\n   Looks up a user by username, returns User or null.\n\n3. src/db.pseudo:22 — save_user(user: User) -> void\n   Persists a User object to the database. Takes User as a direct parameter.\n\nNote: The auth middleware (src/middleware/auth.pseudo) sets req.user to a hardcoded object { id: 1, username: 'unknown' } — this is NOT a real User parameter, it's a hardcoded stub.",
+  "confidence": 0.9,
+  "sources": [
+    "src/models/user.pseudo:8",
+    "src/db.pseudo:15",
+    "src/db.pseudo:22",
+    "src/middleware/auth.pseudo:12"
+  ]
+}
+
+NOTE: Key behaviors demonstrated:
+  1. Agent used search_code FIRST to find candidates (not read every file)
+  2. Agent used read_file to CONFIRM what search found
+  3. Verification cross-checked search results against file contents
+  4. Agent distinguished real User parameters from the hardcoded stub
+  5. Tool calls are explicit and traceable — the reader sees every step
+
+================================================================================
+KEY OBSERVATIONS FOR THE READER
+================================================================================
+
+1. TOOL INTERFACE is uniform — read_file, list_files, search_code all return ToolResult
+2. TOOL SELECTION — the agent picks the right tool for the job (search before read)
+3. TOOL CHAINING — the agent uses multiple tools in sequence (search -> read -> verify)
+4. VERIFICATION catches bad results — non-existent files, empty searches
+5. MCP TOOLS are transparent — the agent doesn't know if a tool is local or remote
+6. The agent is now ACTING, not just THINKING — it searches, reads, verifies
+7. But it can't WRITE anything yet — that's Ch 5
+8. And it uses tools chaotically — no strategy or playbook — that's Ch 4

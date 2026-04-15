@@ -22,47 +22,47 @@ By the end of this book, your agent will read codebases, edit files, run command
 
 | Ch | Title | What You Build |
 |----|-------|----------------|
-| 0 | [The Starting Line](ch00.md) | API keys, Python setup, project skeleton, smoke test |
+| 0 | [The Starting Line](chapters/ch00.md) | API keys, Python setup, project skeleton, smoke test |
 
 ### Foundation
 
 | Ch | Title | What You Build |
 |----|-------|----------------|
-| 1 | [The One-Shot Trap and the Loop That Fixes It](ch01.md) | Prompt wrapper → watch it fail → discover the agent loop |
-| 2 | [Your First Real Agent](ch02.md) | Working agent that answers questions about a codebase |
+| 1 | [The One-Shot Trap and the Loop That Fixes It](chapters/ch01.md) | Prompt wrapper → watch it fail → discover the agent loop |
+| 2 | [Your First Real Agent](chapters/ch02.md) | Working agent that answers questions about a codebase |
 
 ### Tools & Skills
 
 | Ch | Title | What You Build |
 |----|-------|----------------|
-| 3 | [Tool Use + MCP](ch03.md) | Tool calling interface with MCP server/client |
-| 4 | [Skills: Teaching Your Agent What To Do](ch04.md) | Playbooks/recipes that compose tools into behaviors |
-| 5 | [File System + Shell](ch05.md) | Agent reads/writes files, runs commands |
+| 3 | [Tool Use + MCP](chapters/ch03.md) | Tool calling interface with MCP server/client |
+| 4 | [Skills: Teaching Your Agent What To Do](chapters/ch04.md) | Playbooks/recipes that compose tools into behaviors |
+| 5 | [File System + Shell](chapters/ch05.md) | Agent reads/writes files, runs commands |
 
 ### Intelligence
 
 | Ch | Title | What You Build |
 |----|-------|----------------|
-| 6 | [Memory & Context](ch06.md) | Session memory, context management, outcome tracking |
-| 7 | [Planning & Reasoning](ch07.md) | Task decomposition, strategy refinement |
-| 8 | [Evaluation & Guardrails](ch08.md) | Self-check, lint, human gate, diagnostic feedback |
-| 9 | [Self-Improvement: Agents That Get Better](ch09.md) | Mistake journal, skill rewriting, evaluator-optimizer |
+| 6 | [Memory & Context](chapters/ch06.md) | Session memory, context management, outcome tracking |
+| 7 | [Planning & Reasoning](chapters/ch07.md) | Task decomposition, strategy refinement |
+| 8 | [Evaluation & Guardrails](chapters/ch08.md) | Self-check, lint, human gate, diagnostic feedback |
+| 9 | [Self-Improvement: Agents That Get Better](chapters/ch09.md) | Mistake journal, skill rewriting, evaluator-optimizer |
 
 ### The Agent Swarm
 
 | Ch | Title | What You Build |
 |----|-------|----------------|
-| 10 | [Splitting Into Agents](ch10.md) | Monolith → peer agents (coder, reviewer, runner, researcher) |
-| 11 | [Broadcast & Discovery](ch11.md) | Agents announce capabilities + skills, discover peers |
-| 12 | [Peer Communication](ch12.md) | Direct agent-to-agent messaging, artifact handoffs |
-| 13 | [Swarm Patterns](ch13.md) | Orchestrator-workers → peer coordination, consensus, collective learning |
+| 10 | [Splitting Into Agents](chapters/ch10.md) | Monolith → peer agents (coder, reviewer, runner, researcher) |
+| 11 | [Broadcast & Discovery](chapters/ch11.md) | Agents announce capabilities + skills, discover peers |
+| 12 | [Peer Communication](chapters/ch12.md) | Direct agent-to-agent messaging, artifact handoffs |
+| 13 | [Swarm Patterns](chapters/ch13.md) | Orchestrator-workers → peer coordination, consensus, collective learning |
 
 ### Production
 
 | Ch | Title | What You Build |
 |----|-------|----------------|
-| 14 | [Production Architecture](ch14.md) | Checkpoints, tracing, versioned deploys |
-| 15 | [The Agent Ecosystem](ch15.md) | External MCP tools, A2A partner agents, governance |
+| 14 | [Production Architecture](chapters/ch14.md) | Checkpoints, tracing, versioned deploys |
+| 15 | [The Agent Ecosystem](chapters/ch15.md) | External MCP tools, A2A partner agents, governance |
 
 ---
 
@@ -93,16 +93,16 @@ Ch 15: + external MCP tools, A2A partner agents                     ecosystem
 ## How to Use This Book
 
 1. **Read the chapter** — understand the concept and why it matters.
-2. **Read the spec** — each chapter has a spec in `../spec/chNN/` with interface contracts and expected behavior.
+2. **Read the spec** — each chapter has a spec in `spec/chNN/` with interface contracts and expected behavior.
 3. **Build it** — implement the spec in your language. No code to copy. The spec is all you need.
-4. **Validate** — run the validation tests in `../spec/chNN/validation/` to confirm your implementation works.
+4. **Validate** — run the validation tests in `spec/chNN/validation/` to confirm your implementation works.
 5. **Move on** — each chapter builds on the last. Your agent grows incrementally.
 
 ---
 
 ## Specs Define "Done"
 
-Each chapter's spec lives in `../spec/chNN/`:
+Each chapter's spec lives in `spec/chNN/`:
 
 ```
 spec/chNN/

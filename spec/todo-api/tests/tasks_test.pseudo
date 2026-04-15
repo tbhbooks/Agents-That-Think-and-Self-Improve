@@ -1,0 +1,40 @@
+# Task endpoint tests
+# NOTE: No test for DELETE /tasks/:id — intentional gap for Ch 5
+
+test "GET /tasks returns empty list for new user":
+    register_user("testuser", "password123")
+    token = login("testuser", "password123")
+    response = GET("/tasks", headers: { authorization: token })
+    assert response.status == 200
+    assert response.body == []
+
+test "POST /tasks creates a task":
+    token = setup_authenticated_user()
+    response = POST("/tasks", { title: "Buy groceries" }, headers: { authorization: token })
+    assert response.status == 201
+    assert response.body.title == "Buy groceries"
+    assert response.body.status == "pending"
+
+test "GET /tasks/:id returns the task":
+    token = setup_authenticated_user()
+    created = POST("/tasks", { title: "Test task" }, headers: { authorization: token })
+    response = GET("/tasks/" + created.body.id, headers: { authorization: token })
+    assert response.status == 200
+    assert response.body.title == "Test task"
+
+test "GET /tasks/:id returns 404 for wrong user":
+    token1 = setup_authenticated_user("user1")
+    token2 = setup_authenticated_user("user2")
+    created = POST("/tasks", { title: "User1 task" }, headers: { authorization: token1 })
+    response = GET("/tasks/" + created.body.id, headers: { authorization: token2 })
+    assert response.status == 404
+
+test "PUT /tasks/:id updates the task":
+    token = setup_authenticated_user()
+    created = POST("/tasks", { title: "Old title" }, headers: { authorization: token })
+    response = PUT("/tasks/" + created.body.id, { title: "New title" }, headers: { authorization: token })
+    assert response.status == 200
+    fetched = GET("/tasks/" + created.body.id, headers: { authorization: token })
+    assert fetched.body.title == "New title"
+
+# NOTE: DELETE test is MISSING — the agent should discover and write this in Ch 5

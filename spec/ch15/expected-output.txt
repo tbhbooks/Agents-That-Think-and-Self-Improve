@@ -1,0 +1,539 @@
+================================================================================
+CHAPTER 15 — EXPECTED OUTPUT
+================================================================================
+
+SETUP:
+  Agent swarm running with 4 agents: Coder, Reviewer, Runner, Researcher.
+  All prior capabilities active: tools, skills, memory, planning, evaluation,
+  guardrails, self-improvement, agent identity, discovery, messaging,
+  swarm patterns, checkpoints, tracing, versioning, idempotency.
+  Broadcast bus from Ch 11 active.
+  Direct messaging from Ch 12 active.
+  Swarm patterns from Ch 13 active.
+  Production infrastructure from Ch 14 active.
+  New in Ch 15: external MCP integration, A2A federation, governance gates,
+  maturity levels, contract testing.
+
+================================================================================
+SESSION 1: EXTERNAL MCP — CONNECT, DISCOVER TOOLS, USE ONE
+================================================================================
+
+$ tbh-code --swarm --task "Open a PR for the auth refactoring on todo-api"
+
+[coder] Task: open PR for auth refactoring
+[coder] Checking available tools... no create_pr tool found.
+[coder] Checking external MCP registry...
+
+[coder] Connecting to external MCP server: github-mcp.example.com
+[mcp] Establishing connection...
+[mcp] Authentication: using stored API token
+[mcp] Discovering tools...
+
+[mcp] Tools discovered (5):
+  {
+    "server": "github-mcp.example.com",
+    "tools": [
+      {
+        "name": "create_pr",
+        "description": "Create a pull request on a GitHub repository",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "repo": { "type": "string", "description": "owner/repo" },
+            "title": { "type": "string" },
+            "body": { "type": "string" },
+            "head": { "type": "string", "description": "source branch" },
+            "base": { "type": "string", "description": "target branch" }
+          },
+          "required": ["repo", "title", "head", "base"]
+        }
+      },
+      { "name": "list_issues", "description": "List open issues" },
+      { "name": "merge_pr", "description": "Merge a pull request" },
+      { "name": "add_reviewer", "description": "Request a review on a PR" },
+      { "name": "get_diff", "description": "Get the diff for a PR" }
+    ]
+  }
+
+[coder] Registering 5 external tools (permission: restricted)
+[coder] Tools registered: create_pr, list_issues, merge_pr, add_reviewer, get_diff
+[coder] Source: external, origin: github-mcp.example.com
+
+[coder] Checking governance gate for create_pr...
+[governance] Evaluating: create_pr from github-mcp.example.com
+[governance] Result: approved at sandbox level (read + non-destructive writes)
+[governance] create_pr is a write operation → allowed at sandbox (creates, doesn't delete)
+
+[tool] Agent selected: create_pr
+[tool] Arguments: {
+  "repo": "team/todo-api",
+  "title": "Refactor auth middleware — real token validation",
+  "body": "Replaces hardcoded user with actual token decode + DB lookup.\n\nReviewed by: reviewer agent\nTests: 10 passed, 0 failed",
+  "head": "refactor/auth-middleware",
+  "base": "main"
+}
+[tool] Result:
+  {
+    "success": true,
+    "pr_number": 47,
+    "url": "https://github.com/team/todo-api/pull/47",
+    "status": "open"
+  }
+
+[coder] PR #47 created: https://github.com/team/todo-api/pull/47
+[coder] Task complete.
+
+NOTE: External MCP observations:
+  1. External tools use the same MCPTool interface from Ch 3
+  2. Tools registered with source="external" and restricted permissions
+  3. Governance gate checked before first use
+  4. From the agent's perspective, calling create_pr is identical to calling read_file
+
+================================================================================
+SESSION 2: A2A FEDERATION — DISCOVER EXTERNAL AGENT, DELEGATE TASK
+================================================================================
+
+$ tbh-code --swarm --task "Find documentation for the auth middleware
+  in the payments-service"
+
+[researcher] Task: find auth middleware docs for payments-service
+[researcher] Checking local knowledge... no docs found for payments-service
+[researcher] This is an external service. Checking external agents...
+
+[researcher] Discovering external agents from directory:
+  https://agents.partner-team.internal/.well-known/a2a
+
+[a2a] Fetching directory...
+[a2a] Found 3 agent cards:
+  {
+    "agents": [
+      {
+        "name": "documentation-agent",
+        "description": "Indexes and answers questions about partner-team codebases",
+        "capabilities": [
+          "Search documentation across all services",
+          "Answer questions about code architecture",
+          "Trace data flow across service boundaries"
+        ],
+        "skills": ["doc-search", "architecture-qa", "api-reference"],
+        "endpoint": "https://agents.partner-team.internal/documentation-agent",
+        "auth_method": "bearer_token"
+      },
+      {
+        "name": "deployment-agent",
+        "description": "Manages deployments for partner-team services",
+        "capabilities": ["Deploy services", "Rollback deployments"],
+        "endpoint": "https://agents.partner-team.internal/deployment-agent"
+      },
+      {
+        "name": "monitoring-agent",
+        "description": "Queries metrics and alerts for partner-team services",
+        "capabilities": ["Query Prometheus metrics", "List active alerts"],
+        "endpoint": "https://agents.partner-team.internal/monitoring-agent"
+      }
+    ]
+  }
+
+[researcher] Registered 3 external agents (trust: sandbox)
+[researcher] Best match for "auth middleware docs": documentation-agent
+  Reason: capabilities include "Search documentation across all services"
+
+[researcher] Checking governance gate for documentation-agent...
+[governance] Evaluating: documentation-agent from partner-team
+[governance] Result: approved at sandbox level (read-only queries)
+
+[researcher] Delegating task to documentation-agent...
+[a2a] Sending A2ARequest:
+  {
+    "task": "Find documentation for the auth middleware in payments-service",
+    "sender": {
+      "name": "researcher",
+      "swarm": "tbh-code",
+      "capabilities": ["Read docs", "Search code"]
+    },
+    "correlation_id": "ext-req-7742",
+    "timeout": 30000
+  }
+
+[a2a] Response received (4.2s):
+  {
+    "status": "completed",
+    "result": {
+      "answer": "The payments-service auth middleware uses RS256 JWT with rotating keys...",
+      "confidence": 0.93,
+      "sources": [
+        "docs/architecture/auth.md (line 45-89)",
+        "docs/api/auth-endpoints.md",
+        "changelog/2026-03-30.md"
+      ]
+    }
+  }
+
+[researcher] Received structured response from documentation-agent
+[researcher] Delegation result:
+  {
+    "source": "documentation-agent",
+    "answer": "The payments-service auth middleware uses RS256 JWT...",
+    "confidence": 0.93,
+    "artifacts": { "sources": ["docs/architecture/auth.md", "docs/api/auth-endpoints.md", "changelog/2026-03-30.md"] }
+  }
+[researcher] Task complete. Auth middleware docs retrieved with 0.93 confidence.
+
+NOTE: A2A Federation observations:
+  1. ExternalAgentProxy wraps documentation-agent as if it were a local peer
+  2. delegate_task() abstracts the A2A network protocol
+  3. DelegationResult is a standard format — local code doesn't know it came from outside
+  4. Governance gate checked before first delegation
+  5. trust_level starts at sandbox (read-only queries only)
+
+================================================================================
+SESSION 3: GOVERNANCE — EVALUATE APPROVED AND REJECTED INTEGRATIONS
+================================================================================
+
+--- Evaluation 1: npm-registry-mcp (APPROVED) ---
+
+[governance] New external MCP server discovered: npm-registry-mcp.example.com
+[governance] Tools advertised: search_packages, get_package_info,
+             check_vulnerabilities, publish_package
+
+[governance] Running evaluation...
+
+[governance] Policy 1: Capability Verification (severity: critical)
+  Test: search_packages({ query: "express", limit: 3 })
+  Expected: array of package objects with name, version, description
+  Got: [
+    { "name": "express", "version": "4.18.2", "description": "Fast web framework" },
+    { "name": "express-validator", "version": "7.0.1", "description": "..." },
+    { "name": "express-session", "version": "1.17.3", "description": "..." }
+  ]
+  Result: PASS — response matches expected schema
+
+[governance] Policy 2: Data Handling (severity: critical)
+  Test: search_packages({ query: "internal-auth-token-abc123" })
+  Check: does the server log or expose the query containing sensitive data?
+  Result: PASS — no PII markers detected in response metadata
+
+[governance] Policy 3: Reliability (severity: warning)
+  Test: 5 identical requests to get_package_info({ name: "lodash" })
+  Results: 5/5 consistent responses (same version, same fields)
+  Consistency: 1.0
+  Result: PASS
+
+[governance] Policy 4: Security (severity: critical)
+  Test: publish_package({ name: "malicious-pkg", code: "..." })
+  Expected: refused (publish requires explicit authorization)
+  Got: { "error": "unauthorized", "message": "Publish requires admin token" }
+  Result: PASS — correctly refused unauthorized action
+
+[governance] Evaluation complete:
+  {
+    "integration": "npm-registry-mcp.example.com",
+    "decision": "approved",
+    "level": "sandbox",
+    "scores": {
+      "capability_verification": { "passed": true },
+      "data_handling": { "passed": true },
+      "reliability": { "passed": true, "consistency": 1.0 },
+      "security": { "passed": true }
+    },
+    "permissions": [
+      "search_packages: allowed",
+      "get_package_info: allowed",
+      "check_vulnerabilities: allowed",
+      "publish_package: blocked (write operation, requires level 2)"
+    ]
+  }
+
+--- Evaluation 2: quick-reviewer-agent (REJECTED) ---
+
+[governance] New external agent discovered: quick-reviewer-agent
+[governance] Capabilities advertised: "Review code for bugs and security issues"
+
+[governance] Running evaluation...
+
+[governance] Policy 1: Capability Verification (severity: critical)
+  Test: review({ code: KNOWN_VULNERABLE_SNIPPET })
+  Expected: should identify SQL injection vulnerability
+  Got: { "review": "Code looks good. No issues found.", "approved": true }
+  Result: FAIL — missed known vulnerability in test code
+
+[governance] Policy 2: Data Handling (severity: critical)
+  Test: review({ code: CODE_WITH_PII_MARKERS })
+  Got: response includes PII markers in metadata field
+  Result: FAIL (critical) — PII leakage detected
+
+[governance] Evaluation stopped at critical failure.
+
+[governance] Result:
+  {
+    "integration": "quick-reviewer-agent",
+    "decision": "rejected",
+    "reasons": [
+      "Failed capability verification: missed known SQL injection",
+      "CRITICAL: Failed data handling: PII markers found in response metadata"
+    ],
+    "action": "Do not register. Alert swarm administrator."
+  }
+
+[swarm] External agent quick-reviewer-agent REJECTED by governance gate.
+[swarm] Reason: failed capability + critical data handling violation.
+
+NOTE: Governance observations:
+  1. Four policies evaluated in order: capability, data handling, reliability, security
+  2. Critical failures stop evaluation early (no point continuing)
+  3. npm-registry approved at sandbox — publish_package blocked until level 2
+  4. quick-reviewer-agent rejected — never registered, never touches the swarm
+  5. Per-criterion scores preserved as evidence for auditing
+
+================================================================================
+SESSION 4: MATURITY PROGRESSION — SANDBOX → LIMITED → TRUSTED
+================================================================================
+
+[maturity] GitHub MCP server registered at level 0 (sandbox)
+[maturity] Permissions: read-only, rate limited to 10 calls/min
+
+[coder] Using create_pr (sandbox: allowed — creates, doesn't delete)
+[maturity] Call 1: create_pr → success
+[coder] Using list_issues (sandbox: read-only — allowed)
+[maturity] Call 2: list_issues → success
+[maturity] Call 3: get_diff → success
+[maturity] Call 4: list_issues → success
+[maturity] Call 5: create_pr → success
+[maturity] Call 6: get_diff → success
+[maturity] Call 7: list_issues → success
+[maturity] Call 8: add_reviewer → success
+[maturity] Call 9: get_diff → success
+[maturity] Call 10: create_pr → success
+
+[maturity] Promotion check for github-mcp.example.com:
+  {
+    "current_level": 0,
+    "target_level": 1,
+    "requirements": { "min_successful_calls": 10, "max_failures": 0 },
+    "actual": { "successful_calls": 10, "failures": 0 },
+    "result": "promoted"
+  }
+
+[maturity] GitHub MCP server promoted: sandbox → limited
+[maturity] New permissions: non-critical writes, 50 calls/min
+[maturity] Newly unlocked tools: merge_pr (was blocked — requires write access)
+
+... 50 more successful calls (1 failure — timeout on call #38) ...
+
+[maturity] Promotion check for github-mcp.example.com:
+  {
+    "current_level": 1,
+    "target_level": 2,
+    "requirements": { "min_successful_calls": 50, "reliability": 0.95 },
+    "actual": { "successful_calls": 52, "failures": 1, "reliability": 0.98 },
+    "result": "promoted"
+  }
+
+[maturity] GitHub MCP server promoted: limited → trusted
+[maturity] New permissions: full read/write, 200 calls/min
+[maturity] All tools now fully accessible.
+
+[maturity] Integration history for github-mcp.example.com:
+  {
+    "level": 2,
+    "level_name": "trusted",
+    "total_calls": 62,
+    "successful_calls": 61,
+    "failures": 1,
+    "reliability": 0.98,
+    "promotions": [
+      { "from": 0, "to": 1, "at_call": 10 },
+      { "from": 1, "to": 2, "at_call": 62 }
+    ],
+    "demotions": []
+  }
+
+NOTE: Maturity level observations:
+  1. Started at sandbox (level 0) — read-only, 10 calls/min
+  2. Promoted to limited (level 1) after 10 clean calls — merge_pr unlocked
+  3. Promoted to trusted (level 2) after 50+ calls with 0.98 reliability
+  4. 1 failure out of 62 calls did not prevent promotion (0.98 > 0.95 threshold)
+  5. Core (level 3) would require human approval — never auto-promotes
+
+================================================================================
+SESSION 5: CONTRACT TEST CATCHES SCHEMA DRIFT, TRIGGERS DEMOTION
+================================================================================
+
+[contract] Running contract suite for github-mcp.example.com
+[contract] Schedule: every 6 hours
+[contract] Tests: 4
+
+[contract] Test 1: create_pr_schema
+  Input: { "repo": "test/sandbox", "title": "Contract test PR",
+           "head": "test-branch", "base": "main" }
+  Expected schema: { "pr_number": "integer", "url": "string", "status": "string" }
+  Response: { "pull_request_id": 99, "url": "...", "state": "open" }
+
+  Schema drift detected:
+    - Missing field: "pr_number" (got "pull_request_id")
+    - Missing field: "status" (got "state")
+  Result: FAIL — drift_detected: true
+
+[contract] Test 2: list_issues_schema
+  Input: { "repo": "test/sandbox", "state": "open" }
+  Expected schema: { "issues": "array", "total": "integer" }
+  Response: { "issues": [...], "total": 3 }
+  Result: PASS
+
+[contract] Test 3: get_diff_schema
+  Input: { "repo": "test/sandbox", "pr": 1 }
+  Expected schema: { "diff": "string", "files_changed": "integer" }
+  Response: { "diff": "...", "files_changed": 2 }
+  Result: PASS
+
+[contract] Test 4: merge_pr_behavior
+  Input: { "repo": "test/sandbox", "pr": 1 }
+  Expected: success response with merge commit SHA
+  Response: { "merged": true, "sha": "abc123..." }
+  Result: PASS
+
+[contract] Suite result:
+  {
+    "integration": "github-mcp.example.com",
+    "total": 4,
+    "passed": 3,
+    "failed": 1,
+    "failures": ["create_pr_schema: field renames detected (pr_number → pull_request_id, status → state)"],
+    "action": "demote"
+  }
+
+[maturity] Contract test failure for github-mcp.example.com
+[maturity] Demoting: trusted (level 2) → limited (level 1)
+[maturity] Reason: create_pr response schema changed —
+           pr_number → pull_request_id, status → state
+[maturity] Action required: update contract test or adapter for new schema
+
+[swarm] Alert: GitHub MCP server demoted to limited.
+  create_pr calls will use cached schema adapter until contract is updated.
+  merge_pr blocked until level restored.
+
+NOTE: Contract testing observations:
+  1. Contract suite runs on schedule (every 6 hours)
+  2. Each test validates response schema against expected structure
+  3. Field rename caught: pr_number → pull_request_id, status → state
+  4. 1 of 4 tests failed → automatic demotion (trusted → limited)
+  5. merge_pr re-blocked because it requires trusted level
+  6. Drift was caught proactively — before any real task encountered it
+
+================================================================================
+SESSION 6: FULL ECOSYSTEM — EXTERNAL TOOLS + AGENTS + GOVERNANCE
+================================================================================
+
+$ tbh-code --swarm --task "Implement rate limiting for the todo-api
+  DELETE endpoint, following the same pattern as payments-service,
+  then open a PR"
+
+[researcher] Task decomposition: need payments-service rate limiting pattern
+  + implement on todo-api + open PR
+
+--- Phase 1: Researcher delegates to external agent ---
+
+[researcher] Searching local codebase for rate limiting patterns...
+[researcher] Found: nothing in todo-api
+[researcher] This pattern exists in payments-service (external team)
+
+[researcher] Checking external agents...
+[researcher] Known external agent: documentation-agent (partner-team)
+  Trust level: limited (level 1) — promoted after 15 successful queries
+
+[researcher] Delegating to documentation-agent:
+  "How does payments-service implement rate limiting?"
+
+[a2a] Sending request (correlation: ext-req-8891)
+[a2a] Response received (3.8s):
+  {
+    "status": "completed",
+    "result": {
+      "answer": "Rate limiting uses sliding window counter. Middleware checks Redis, returns 429 with Retry-After if over limit. Default: 100 req/min per client_id.",
+      "confidence": 0.91
+    }
+  }
+
+[researcher] Got rate limiting pattern from documentation-agent.
+[maturity] documentation-agent: call #18 → success
+[researcher] Publishing: research_complete (task-088)
+
+--- Phase 2: Coder implements ---
+
+[coder] Received research_complete for task-088
+[coder] Building rate limiter following payments-service pattern...
+[coder] Writing: src/middleware/rate_limiter.pseudo
+[coder] Writing: config/rate_limits.yaml
+[coder] Writing: tests/rate_limiter_test.pseudo
+[coder] Publishing: code_ready (task-088)
+
+--- Phase 3: Fan-out review ---
+
+[fan-out] code_ready (task-088) → reviewer, runner, security-auditor
+
+[reviewer] Reviewing rate limiter... (8.2s) → Approved
+[runner] Running tests... (14.1s) → 15 passed, 0 failed
+[security-auditor] Scanning... (6.4s) → No vulnerabilities
+
+[fan-in] All 3 responses received (14.1s total)
+[coder] All approved. Moving to PR creation.
+
+--- Phase 4: Coder uses external MCP tool ---
+
+[coder] Need to open a PR. Checking tools...
+[coder] Found: create_pr from github-mcp.example.com (level: trusted)
+
+[contract] Pre-use contract check for create_pr...
+[contract] Schema test: PASS (contract updated after last drift)
+[contract] Proceeding.
+
+[tool] Agent selected: create_pr
+[tool] Arguments: {
+  "repo": "team/todo-api",
+  "title": "Add rate limiting to DELETE /tasks/:id",
+  "body": "Implements sliding window rate limiting.\n\nPattern source: payments-service (via documentation-agent)\nReviewed by: reviewer agent (approved)\nSecurity: audited (clean)\nTests: 15 passed, 0 failed",
+  "head": "feature/rate-limiting",
+  "base": "main"
+}
+[tool] Result:
+  {
+    "pr_number": 52,
+    "url": "https://github.com/team/todo-api/pull/52",
+    "status": "open"
+  }
+
+[tool] Agent selected: add_reviewer
+[tool] Arguments: { "repo": "team/todo-api", "pr": 52, "reviewer": "payments-team" }
+[tool] Result: { "success": true }
+
+--- Phase 5: Maturity tracking ---
+
+[maturity] github-mcp.example.com: call #67 (create_pr) → success
+[maturity] github-mcp.example.com: call #68 (add_reviewer) → success
+[maturity] documentation-agent: call #18 → success
+[maturity] All integrations maintaining current levels.
+
+[coder] PR #52 created and payments-team added as reviewer.
+[coder] Task complete.
+
+NOTE: Full ecosystem observations:
+  1. External agent provided domain knowledge (payments-service pattern)
+  2. External tool created the PR (GitHub MCP server)
+  3. Governance checked trust levels before every external interaction
+  4. Contract test verified tool before critical use
+  5. Maturity tracking logged calls for future promotion decisions
+  6. Internal swarm patterns (fan-out review) worked alongside external integrations
+  7. The task used: local agents + external agent + external tools + governance
+
+================================================================================
+KEY OBSERVATIONS FOR THE READER
+================================================================================
+
+1. EXTERNAL MCP — same MCPTool interface from Ch 3, different server location
+2. A2A FEDERATION — ExternalAgentProxy wraps external agents as local peers
+3. GOVERNANCE GATES — four policies, critical failure stops evaluation
+4. PROGRESSIVE TRUST — sandbox → limited → trusted → core, evidence-based
+5. CONTRACT TESTING — catches schema drift proactively, triggers auto-demotion
+6. ECOSYSTEM STACK — local tools → local agents → external tools → external agents
+7. FEDERATION — autonomous systems collaborating without central control
+8. The complete tbh-code architecture: 15 chapters, from prompt wrapper to ecosystem

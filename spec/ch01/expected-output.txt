@@ -1,0 +1,114 @@
+================================================================================
+CHAPTER 1 — EXPECTED OUTPUT
+================================================================================
+
+TASK:
+  "Find the security vulnerability in the todo-api authentication system.
+   Identify the file, the function, and explain what's wrong."
+
+================================================================================
+PROGRAM 1: ONE-SHOT MODE
+================================================================================
+
+$ tbh-code --mode oneshot --task "Find the security vulnerability in the todo-api authentication system."
+
+[oneshot] Response:
+The authentication system in todo-api has a critical vulnerability in the
+`auth_handler.py` file, specifically in the `validate_token()` function.
+The issue is that JWT tokens are not properly validated — the function
+checks the token format but doesn't verify the signature against the
+secret key. This means an attacker could forge tokens with arbitrary
+claims.
+
+To fix this, you should use a proper JWT library to validate the
+signature, check the expiration claim, and verify the issuer...
+
+NOTE: This response is WRONG. The one-shot has:
+  ✗ Invented a file name (auth_handler.py doesn't exist)
+  ✗ Invented a function name (validate_token doesn't exist)
+  ✗ Fabricated a plausible but incorrect vulnerability (JWT signature issue)
+  ✗ Sounds extremely confident despite being completely wrong
+  → This is the "confidence illusion" — the core lesson of Ch 1
+
+================================================================================
+PROGRAM 2: AGENT LOOP MODE
+================================================================================
+
+$ tbh-code --mode loop --task "Find the security vulnerability in the todo-api authentication system." --max-iterations 5
+
+[loop] Iteration 1:
+  [observe] Task: find auth vulnerability. No prior results. No file access.
+  [think] I should analyze the authentication system. Without seeing the code,
+          I'll reason about common auth vulnerabilities.
+  [act] The authentication system likely has a vulnerability in token validation.
+        Common issues include: missing signature verification, no expiry checks,
+        or insecure token storage. The file is probably `auth_handler.py` or
+        `middleware/auth.py` and the function might be `validate_token()` or
+        `check_auth()`.
+  [reflect] confidence=0.2
+            issues=["I'm guessing file names — I haven't seen the codebase",
+                    "Multiple hedge words: 'likely', 'probably', 'might be'",
+                    "No specific evidence for any claim"]
+            should_continue=true
+
+[loop] Iteration 2:
+  [observe] Previous answer had low confidence (0.2). Issues: guessing file
+            names, heavy hedging. I need to be more careful about what I
+            actually know vs what I'm guessing.
+  [think] I can't verify file names or function names without seeing the code.
+          I should be explicit about what I know (common patterns) vs what I
+          don't know (this specific codebase).
+  [act] I cannot identify the specific file or function without access to the
+        codebase. However, based on common patterns, auth vulnerabilities
+        typically appear in: (1) the token generation logic — weak tokens or
+        missing signatures, (2) the token validation middleware — accepting
+        tokens without proper checks, (3) password handling — plaintext storage
+        or weak hashing. To give a specific answer, I would need to read the
+        actual source files.
+  [reflect] confidence=0.5
+            issues=["Still no verification of specific files",
+                    "But answer is now honest about its limitations"]
+            should_continue=true
+
+[loop] Iteration 3:
+  [observe] Confidence improved (0.5) but still can't name specifics. The answer
+            is honest but not actionable. Without file access, I can't go further.
+  [think] I've reached the limit of what I can do without tools. My answer is
+          as grounded as possible given my constraints. Further iterations won't
+          improve it.
+  [act] Based on analysis without direct code access: the authentication system
+        most likely has a vulnerability in its token validation logic. The
+        middleware that checks auth tokens may accept tokens without verifying
+        the signature, checking expiry, or confirming the user exists. I cannot
+        confirm the specific file or function name without reading the codebase.
+  [reflect] confidence=0.5
+            issues=["Cannot improve without file access — this is my limit"]
+            should_continue=false
+
+[loop] Result after 3 iterations:
+Based on analysis without direct code access: the authentication system
+most likely has a vulnerability in its token validation logic. The
+middleware that checks auth tokens may accept tokens without verifying
+the signature, checking expiry, or confirming the user exists. I cannot
+confirm the specific file or function name without reading the codebase.
+
+NOTE: This response is BETTER than one-shot:
+  ✓ Does NOT invent file names or function names
+  ✓ Explicitly states what it can't verify
+  ✓ Correctly identifies the category of vulnerability (token validation)
+  ✓ Correctly identifies the location (middleware)
+  ✓ Honest about its limitations — "I cannot confirm without reading"
+  ✗ Still can't name the exact file or bug (needs tools — Ch 2+)
+  → The loop caught the hallucination. But it hit a ceiling.
+  → That ceiling is the bridge to Ch 2: "give the agent eyes."
+
+================================================================================
+KEY OBSERVATIONS FOR THE READER
+================================================================================
+
+1. ONE-SHOT was confident and WRONG — invented auth_handler.py, validate_token()
+2. AGENT LOOP was uncertain and HONEST — caught its own hallucination in reflect
+3. AGENT LOOP still couldn't solve the task — no file access means no specifics
+4. The loop improved the output but hit a ceiling — that ceiling motivates Ch 2
+5. Iteration count: the loop converged in 3 iterations (not max 5)
+6. Confidence went: 0.2 → 0.5 → 0.5 (plateau = signal to stop)

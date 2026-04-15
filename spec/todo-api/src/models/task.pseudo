@@ -1,0 +1,16 @@
+# Task model
+
+Task:
+    id: integer (auto-generated)
+    title: string (required)
+    description: string (optional)
+    due_date: string (ISO 8601 date, optional)
+    status: enum("pending", "in_progress", "done")
+    user_id: integer (foreign key → users.id)
+    created_at: timestamp
+    updated_at: timestamp
+
+Tag:
+    id: integer (auto-generated)
+    task_id: integer (foreign key → tasks.id)
+    name: string (required)

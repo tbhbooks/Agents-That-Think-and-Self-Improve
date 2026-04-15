@@ -1,0 +1,24 @@
+# Auth endpoint tests
+
+test "POST /auth/register creates a user":
+    response = POST("/auth/register", { username: "newuser", password: "pass123" })
+    assert response.status == 201
+    assert response.body.username == "newuser"
+
+test "POST /auth/register rejects duplicate username":
+    POST("/auth/register", { username: "dupeuser", password: "pass123" })
+    response = POST("/auth/register", { username: "dupeuser", password: "pass456" })
+    assert response.status == 409
+
+test "POST /auth/login returns a token":
+    POST("/auth/register", { username: "loginuser", password: "pass123" })
+    response = POST("/auth/login", { username: "loginuser", password: "pass123" })
+    assert response.status == 200
+    assert response.body.token != null
+
+test "POST /auth/login rejects wrong password":
+    POST("/auth/register", { username: "wrongpass", password: "pass123" })
+    response = POST("/auth/login", { username: "wrongpass", password: "wrong" })
+    assert response.status == 401
+
+# NOTE: No test for token validation logic — the middleware bug goes undetected

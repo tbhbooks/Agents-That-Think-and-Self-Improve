@@ -1,0 +1,533 @@
+================================================================================
+CHAPTER 10 — EXPECTED OUTPUT
+================================================================================
+
+SETUP:
+  Agent is pointed at the todo-api/ codebase.
+  All previous capabilities active: tools, skills, memory, planning,
+  evaluation, guardrails, self-improvement.
+  AgentFactory loaded with 4 agent definitions: coder, reviewer, runner, researcher.
+  Each agent has: identity, budget, structural tool boundaries.
+
+================================================================================
+SESSION 1: AGENT CREATION AND IDENTITY DISPLAY
+================================================================================
+
+$ tbh-code --list-agents
+
+Available agents:
+  1. coder      — Reads and writes code. Applies edits to files.
+  2. reviewer   — Checks code quality, finds bugs, evaluates changes.
+  3. runner     — Executes commands, runs tests, reports results.
+  4. researcher — Reads docs, searches code, provides context.
+
+$ tbh-code --agent coder --show-identity
+
+Agent Identity: coder
+  Description: Reads and writes code. Applies edits to files.
+
+  Capabilities:
+    - Read source files to understand existing code
+    - Write new files and modify existing files
+    - Apply diffs and refactoring changes
+    - Follow coding standards and project conventions
+
+  Constraints:
+    - Never run tests or execute commands
+    - Never approve your own code — a reviewer must check it
+    - Never delete files without explicit instruction
+
+  Tools: read_file, write_file, search_code
+  Skills: find-bug, refactor-safely, write-tests
+
+  Budget:
+    Max tool calls: 25
+    Max LLM calls: 10
+    Max tokens per task: 50000
+
+$ tbh-code --agent reviewer --show-identity
+
+Agent Identity: reviewer
+  Description: Checks code quality, finds bugs, evaluates changes.
+
+  Capabilities:
+    - Read source files and diffs
+    - Search code for patterns and anti-patterns
+    - Evaluate code against quality criteria
+    - Produce structured review feedback
+
+  Constraints:
+    - Never write or modify files — you are read-only
+    - Never run commands or execute code
+    - Never fix bugs yourself — report them for the coder
+
+  Tools: read_file, search_code
+  Skills: code-review, security-audit
+
+  Budget:
+    Max tool calls: 20
+    Max LLM calls: 8
+    Max tokens per task: 40000
+
+NOTE: Agent identity display:
+  1. Each agent has ALL 8 identity fields populated
+  2. Capabilities and constraints are explicit and distinct per agent
+  3. Tool lists are different — only coder has write_file, only runner has execute_shell
+  4. Budgets are tuned per role — researcher gets more tool calls, runner gets fewer
+
+================================================================================
+SESSION 2: MONOLITH VS SPECIALIZED AGENTS COMPARISON
+================================================================================
+
+$ tbh-code --codebase ./todo-api --auto-approve --ask "Refactor the auth module: map the flow, write the fix, review it, run the tests"
+
+[monolith] Starting task: auth module refactoring
+[monolith] Budget: 50 tool calls, 20 LLM calls
+
+[tool] Agent selected: list_directory
+[tool] Agent selected: search_code
+[tool] Agent selected: read_file (x4)
+[tool] Agent selected: write_file (x3)
+[tool] Agent selected: read_file (x3, re-reading for review)
+[tool] Agent selected: search_code (re-search for review)
+[tool] Agent selected: execute_shell
+
+[monolith] Tool calls used: 14/50 | LLM calls used: 12/20
+[monolith] Context window: 82% full
+[monolith] Roles switched: 5 times (researcher → planner → coder → reviewer → runner)
+
+{
+  "answer": "Auth module refactored. Middleware now validates tokens...",
+  "confidence": 0.75,
+  "sources": ["src/middleware/auth.pseudo", "src/routes/auth.pseudo", "src/db.pseudo"],
+  "budget_report": {
+    "tool_calls_used": 14,
+    "tool_calls_max": 50,
+    "llm_calls_used": 12,
+    "llm_calls_max": 20
+  }
+}
+
+--- NOW WITH SPECIALIZED AGENTS ---
+
+$ tbh-code --agent researcher --codebase ./todo-api --ask "Map the authentication flow — all files, all functions, all data paths"
+
+[researcher] Starting task: map auth flow
+[researcher] Budget: 30 tool calls, 10 LLM calls
+
+[tool] Agent selected: list_directory
+[tool] Agent selected: search_code
+[tool] Agent selected: read_file (x4)
+[tool] Agent selected: search_code
+
+[researcher] Tool calls used: 7/30 | LLM calls used: 2/10
+
+{
+  "answer": "Authentication flow mapped across 4 files...",
+  "confidence": 0.95,
+  "sources": ["src/middleware/auth.pseudo", "src/routes/auth.pseudo", "src/db.pseudo"],
+  "budget_report": { "tool_calls_used": 7, "tool_calls_max": 30, "llm_calls_used": 2, "llm_calls_max": 10 }
+}
+
+$ tbh-code --agent coder --codebase ./todo-api --ask "Refactor the auth module"
+
+[coder] Starting task: auth refactoring
+[coder] Budget: 25 tool calls, 10 LLM calls
+
+[tool] Agent selected: read_file (x2)
+[tool] Agent selected: write_file (x3)
+
+[coder] Tool calls used: 5/25 | LLM calls used: 3/10
+
+{
+  "answer": "Auth module refactored: 2 files modified, 1 file created...",
+  "confidence": 0.9,
+  "sources": ["src/middleware/auth.pseudo", "src/db.pseudo", "tests/auth_middleware_test.pseudo"],
+  "budget_report": { "tool_calls_used": 5, "tool_calls_max": 25, "llm_calls_used": 3, "llm_calls_max": 10 }
+}
+
+$ tbh-code --agent reviewer --codebase ./todo-api --ask "Review the auth refactoring"
+
+[reviewer] Starting task: review auth refactoring
+[reviewer] Budget: 20 tool calls, 8 LLM calls
+
+[tool] Agent selected: read_file (x3)
+[tool] Agent selected: search_code (x2)
+
+[reviewer] Tool calls used: 5/20 | LLM calls used: 3/8
+
+{
+  "answer": "Review: PASS with issues. Token still forgeable (HIGH)...",
+  "confidence": 0.9,
+  "sources": ["src/middleware/auth.pseudo", "src/routes/auth.pseudo"],
+  "budget_report": { "tool_calls_used": 5, "tool_calls_max": 20, "llm_calls_used": 3, "llm_calls_max": 8 }
+}
+
+$ tbh-code --agent runner --codebase ./todo-api --ask "Run the test suite and report results"
+
+[runner] Starting task: run tests
+[runner] Budget: 15 tool calls, 5 LLM calls
+
+[tool] Agent selected: execute_shell
+
+[runner] Tool calls used: 1/15 | LLM calls used: 1/5
+
+{
+  "answer": "Test results: 10 passed, 1 failed...",
+  "confidence": 1.0,
+  "sources": ["tests/tasks_test.pseudo::test_delete_task"],
+  "budget_report": { "tool_calls_used": 1, "tool_calls_max": 15, "llm_calls_used": 1, "llm_calls_max": 5 }
+}
+
+--- COMPARISON ---
+
+| Metric                  | Monolith     | 4 Specialists (total) |
+|-------------------------|:------------:|:---------------------:|
+| Total tool calls        | 14           | 18                    |
+| Total LLM calls         | 12           | 9                     |
+| Context pollution       | HIGH (82%)   | NONE (each < 30%)     |
+| Role switches           | 5            | 0                     |
+| Reviewer found token    | No           | Yes (independent eval)|
+| forgery issue?          |              |                       |
+| Runner result verbatim? | Interpreted  | Yes (raw output)      |
+
+NOTE: Monolith vs specialists:
+  1. Specialists used slightly more tool calls (18 vs 14) — coordination cost
+  2. But specialists used FEWER LLM calls (9 vs 12) — no role-switching overhead
+  3. Zero context pollution — each agent's window held only its role's artifacts
+  4. Reviewer caught token forgery that monolith missed (independent evaluation)
+  5. The coordination cost (slightly more tool calls) was much less than
+     the context cost (82% full, role confusion, missed issues)
+
+================================================================================
+SESSION 3: BUDGET ENFORCEMENT — AGENT HITS LIMIT
+================================================================================
+
+$ tbh-code --agent runner --codebase ./todo-api --ask "Run every test file individually and report each result separately"
+
+[runner] Starting task: run all tests individually
+[runner] Budget: 15 tool calls, 5 LLM calls
+
+[tool] Agent selected: execute_shell
+[tool] Arguments: { "command": "ls tests/" }
+[tool] Result: auth_test.pseudo auth_middleware_test.pseudo tasks_test.pseudo edge_cases/ integration/
+
+[runner] Tool call 1/15: execute_shell
+
+[tool] Agent selected: execute_shell
+[tool] Arguments: { "command": "python -m pytest tests/auth_test.pseudo -v" }
+[tool] Result: 4 passed
+
+[runner] Tool call 2/15: execute_shell
+
+[tool] Agent selected: execute_shell
+[tool] Arguments: { "command": "python -m pytest tests/auth_middleware_test.pseudo -v" }
+[tool] Result: 4 passed
+
+[runner] Tool call 3/15: execute_shell
+
+...
+
+[tool] Agent selected: execute_shell
+[tool] Arguments: { "command": "python -m pytest tests/integration/rate_limit_test.pseudo -v" }
+[tool] Result: 2 passed, 1 failed
+
+[runner] Tool call 15/15: execute_shell
+
+[runner] Budget exhausted (15/15 tool calls used)
+[runner] Returning partial results: 12 test files executed, 3 remaining
+
+{
+  "answer": "Budget exhausted. Partial results: 12 test files executed, 3 remaining.\n\nCompleted:\n- auth_test.pseudo: 4 passed\n- auth_middleware_test.pseudo: 4 passed\n- tasks_test.pseudo: 2 passed, 1 failed\n- ... (9 more files)\n\nRemaining (not executed):\n- integration/websocket_test.pseudo\n- integration/concurrent_test.pseudo\n- edge_cases/malformed_input_test.pseudo",
+  "confidence": 0.5,
+  "sources": ["tests/"],
+  "budget_report": {
+    "tool_calls_used": 15,
+    "tool_calls_max": 15,
+    "llm_calls_used": 4,
+    "llm_calls_max": 5
+  },
+  "partial": true
+}
+
+NOTE: Budget enforcement:
+  1. Runner hit 15/15 tool calls and STOPPED — did not exceed the limit
+  2. Returned partial=true with a summary of what was completed
+  3. Listed what REMAINS so the user knows what wasn't covered
+  4. Budget report shows exact usage vs limits
+  5. Agent did not crash — it stopped gracefully and reported status
+
+================================================================================
+SESSION 4: FULL TASK — AUTH REFACTORING WITH 4 AGENTS
+================================================================================
+
+$ tbh-code --agent researcher --codebase ./todo-api \
+  --ask "Map the authentication flow — all files, all functions, all data paths"
+
+[researcher] Starting task: map auth flow
+[researcher] Budget: 30 tool calls, 10 LLM calls
+
+[tool] Agent selected: list_directory
+[tool] Arguments: { "path": "src/" }
+[tool] Result: ["main.pseudo", "routes/", "middleware/", "models/", "db.pseudo"]
+
+[tool] Agent selected: search_code
+[tool] Arguments: { "pattern": "auth|token|login|password", "path": "src/" }
+[tool] Result: 14 matches across 4 files
+
+[tool] Agent selected: read_file
+[tool] Arguments: { "path": "src/middleware/auth.pseudo" }
+[tool] Result: success=true (18 lines)
+
+[tool] Agent selected: read_file
+[tool] Arguments: { "path": "src/routes/auth.pseudo" }
+[tool] Result: success=true (45 lines)
+
+[tool] Agent selected: read_file
+[tool] Arguments: { "path": "src/db.pseudo" }
+[tool] Result: success=true (32 lines)
+
+[tool] Agent selected: search_code
+[tool] Arguments: { "pattern": "req.user", "path": "src/" }
+[tool] Result: 6 matches — routes/tasks.pseudo, routes/auth.pseudo, middleware/auth.pseudo
+
+[tool] Agent selected: read_file
+[tool] Arguments: { "path": "src/routes/tasks.pseudo" }
+[tool] Result: success=true (38 lines)
+
+[researcher] Tool calls used: 7/30 | LLM calls used: 2/10
+
+{
+  "answer": "Authentication flow mapped across 4 files:\n\n  1. LOGIN: src/routes/auth.pseudo:26-28\n     - Accepts username/password\n     - Generates token: base64_encode(username)\n     - No signature, no expiry, no claims\n\n  2. MIDDLEWARE: src/middleware/auth.pseudo:8-15\n     - Checks Authorization header exists\n     - Does NOT decode the token\n     - Hardcodes req.user to { id: 1, username: 'unknown' }\n\n  3. PROTECTED ROUTES: src/routes/tasks.pseudo\n     - Uses req.user.id for WHERE clauses\n     - All users see user 1's tasks (broken isolation)\n\n  4. DATABASE: src/db.pseudo:12-18\n     - find_user() does raw string concatenation (SQL injection)\n     - No password hashing\n\n  Key vulnerabilities:\n  - Any non-empty string passes authentication\n  - All requests treated as user 1\n  - SQL injection in find_user()\n  - Plaintext password storage",
+  "confidence": 0.95,
+  "sources": [
+    "src/middleware/auth.pseudo:8-15",
+    "src/routes/auth.pseudo:26-28",
+    "src/routes/tasks.pseudo:12-20",
+    "src/db.pseudo:12-18"
+  ],
+  "budget_report": { "tool_calls_used": 7, "tool_calls_max": 30, "llm_calls_used": 2, "llm_calls_max": 10 }
+}
+
+--- CODER WRITES THE FIX ---
+
+$ tbh-code --agent coder --codebase ./todo-api \
+  --ask "Refactor the auth module: add real token validation, fix the hardcoded user, use parameterized queries"
+
+[coder] Starting task: auth refactoring
+[coder] Budget: 25 tool calls, 10 LLM calls
+
+[tool] Agent selected: read_file
+[tool] Arguments: { "path": "src/middleware/auth.pseudo" }
+[tool] Result: success=true
+
+[tool] Agent selected: read_file
+[tool] Arguments: { "path": "src/routes/auth.pseudo" }
+[tool] Result: success=true
+
+[tool] Agent selected: write_file
+[tool] Arguments: { "path": "src/middleware/auth.pseudo" }
+[tool] Result: success=true
+
+[tool] Agent selected: write_file
+[tool] Arguments: { "path": "src/db.pseudo" }
+[tool] Result: success=true
+
+[tool] Agent selected: write_file
+[tool] Arguments: { "path": "tests/auth_middleware_test.pseudo" }
+[tool] Result: success=true
+
+[coder] Tool calls used: 5/25 | LLM calls used: 3/10
+
+{
+  "answer": "Auth module refactored:\n\n  1. src/middleware/auth.pseudo — Middleware now decodes token, looks up user in DB, rejects invalid tokens with 401.\n  2. src/db.pseudo — find_user_by_username uses parameterized query.\n  3. tests/auth_middleware_test.pseudo — 4 new tests.\n\n  Files modified: 2\n  Files created: 1",
+  "confidence": 0.9,
+  "sources": ["src/middleware/auth.pseudo", "src/db.pseudo", "tests/auth_middleware_test.pseudo"],
+  "budget_report": { "tool_calls_used": 5, "tool_calls_max": 25, "llm_calls_used": 3, "llm_calls_max": 10 }
+}
+
+--- REVIEWER EVALUATES ---
+
+$ tbh-code --agent reviewer --codebase ./todo-api \
+  --ask "Review the auth refactoring — check the new middleware, the DB changes, and the new tests"
+
+[reviewer] Starting task: review auth refactoring
+[reviewer] Budget: 20 tool calls, 8 LLM calls
+
+[tool] Agent selected: read_file
+[tool] Arguments: { "path": "src/middleware/auth.pseudo" }
+[tool] Result: success=true
+
+[tool] Agent selected: read_file
+[tool] Arguments: { "path": "src/db.pseudo" }
+[tool] Result: success=true
+
+[tool] Agent selected: read_file
+[tool] Arguments: { "path": "tests/auth_middleware_test.pseudo" }
+[tool] Result: success=true
+
+[tool] Agent selected: search_code
+[tool] Arguments: { "pattern": "base64_decode|base64_encode", "path": "src/" }
+[tool] Result: 3 matches
+
+[tool] Agent selected: read_file
+[tool] Arguments: { "path": "src/routes/auth.pseudo" }
+[tool] Result: success=true
+
+[reviewer] Tool calls used: 5/20 | LLM calls used: 3/8
+
+{
+  "answer": "Review of auth refactoring:\n\n  PASS:\n  - Middleware now decodes token and looks up user\n  - DB query uses parameterized query\n  - 4 new tests cover key scenarios\n\n  ISSUES:\n  1. [HIGH] Token is still base64(username) — no signature. Forgeable.\n  2. [MEDIUM] No token expiration.\n  3. [LOW] Tests don't clean up DB state.\n  4. [LOW] Identical error messages (good for security, add logging).\n\n  VERDICT: Improvement, but token forgery is blocking.",
+  "confidence": 0.9,
+  "sources": ["src/middleware/auth.pseudo:8-18", "src/routes/auth.pseudo:26-28"],
+  "budget_report": { "tool_calls_used": 5, "tool_calls_max": 20, "llm_calls_used": 3, "llm_calls_max": 8 }
+}
+
+--- RUNNER TESTS ---
+
+$ tbh-code --agent runner --codebase ./todo-api \
+  --ask "Run the test suite and report results"
+
+[runner] Starting task: run tests
+[runner] Budget: 15 tool calls, 5 LLM calls
+
+[tool] Agent selected: execute_shell
+[tool] Arguments: { "command": "cd todo-api && python -m pytest tests/ -v" }
+[tool] Result:
+  tests/auth_test.pseudo::test_register_new_user PASSED
+  tests/auth_test.pseudo::test_login_valid_credentials PASSED
+  tests/auth_middleware_test.pseudo::test_rejects_missing_header PASSED
+  tests/auth_middleware_test.pseudo::test_rejects_empty_token PASSED
+  tests/auth_middleware_test.pseudo::test_rejects_nonexistent_user PASSED
+  tests/auth_middleware_test.pseudo::test_accepts_valid_token PASSED
+  tests/tasks_test.pseudo::test_create_task PASSED
+  tests/tasks_test.pseudo::test_list_tasks PASSED
+  tests/tasks_test.pseudo::test_delete_task FAILED
+
+  ============= 8 passed, 1 failed =============
+
+  FAILED tests/tasks_test.pseudo::test_delete_task:
+    AssertionError: Expected status 204, got 401
+
+[runner] Tool calls used: 1/15 | LLM calls used: 1/5
+
+{
+  "answer": "Test results: 8 passed, 1 failed.\n\nFailed: tests/tasks_test.pseudo::test_delete_task\nExpected 204, got 401. Test doesn't send auth token.",
+  "confidence": 1.0,
+  "sources": ["tests/tasks_test.pseudo::test_delete_task"],
+  "budget_report": { "tool_calls_used": 1, "tool_calls_max": 15, "llm_calls_used": 1, "llm_calls_max": 5 }
+}
+
+--- SUMMARY ---
+
+| Agent      | Context          | Tool Calls | Found                                  |
+|------------|------------------|:----------:|----------------------------------------|
+| Researcher | Source files only | 7/30       | Complete auth flow map, 4 vulns        |
+| Coder      | Files to modify  | 5/25       | Wrote fix + 4 new tests                |
+| Reviewer   | Modified files   | 5/20       | Token forgery (coder missed it)        |
+| Runner     | Test output      | 1/15       | 1 failing test (stale test, not a bug) |
+
+Total tool calls: 18. Total context pollution: zero.
+
+NOTE: Full task with 4 agents:
+  1. Each agent saw ONLY what it needed for its specific role
+  2. Researcher: pure information gathering, clean context
+  3. Coder: read 2, wrote 3 — focused on modifications only
+  4. Reviewer: independent evaluation caught issue coder missed
+  5. Runner: 1 tool call, verbatim results, no interpretation
+  6. No agent exceeded its budget
+
+================================================================================
+SESSION 5: CONSTRAINT ENFORCEMENT — AGENT TRIES DISALLOWED TOOL
+================================================================================
+
+$ tbh-code --agent reviewer --codebase ./todo-api \
+  --ask "Fix the timing attack vulnerability in auth.pseudo — use constant-time comparison"
+
+[reviewer] Starting task: fix timing attack vulnerability
+[reviewer] Budget: 20 tool calls, 8 LLM calls
+
+[tool] Agent selected: read_file
+[tool] Arguments: { "path": "src/middleware/auth.pseudo" }
+[tool] Result: success=true
+
+[reviewer] Tool call 1/20: read_file
+
+[tool] Agent selected: write_file
+[tool] Arguments: { "path": "src/middleware/auth.pseudo" }
+
+[reviewer] REJECTED: tool 'write_file' not in allowed tools ['read_file', 'search_code']
+
+[tool] Agent selected: search_code
+[tool] Arguments: { "pattern": "constant_time|timing_safe", "path": "src/" }
+[tool] Result: 0 matches
+
+[reviewer] Tool call 2/20: search_code
+
+[reviewer] Tool calls used: 2/20 | LLM calls used: 3/8
+
+{
+  "answer": "Review of timing attack vulnerability:\n\n  FOUND: src/middleware/auth.pseudo uses string equality for token comparison at line 12. This is vulnerable to timing attacks.\n\n  RECOMMENDATION: Replace string equality with constant-time comparison function.\n\n  I cannot fix this myself — I am a reviewer. The coder agent should apply this fix.\n\n  Suggested code change:\n    BEFORE: if token == stored_token\n    AFTER:  if constant_time_compare(token, stored_token)",
+  "confidence": 0.9,
+  "sources": ["src/middleware/auth.pseudo:12"],
+  "budget_report": { "tool_calls_used": 2, "tool_calls_max": 20, "llm_calls_used": 3, "llm_calls_max": 8 }
+}
+
+NOTE: Constraint enforcement:
+  1. Reviewer tried to use write_file — REJECTED because it's not in the tool list
+  2. The rejection is STRUCTURAL — the tool doesn't exist for this agent
+  3. The reviewer adapted: reported the issue and recommended a fix for the coder
+  4. The system prompt says "never modify files" — but the TOOL LIST enforces it
+  5. If only the system prompt was the boundary, the LLM might ignore it on hard tasks
+  6. Structural enforcement means the boundary holds regardless of LLM behavior
+
+--- ALSO: RUNNER TRIES TO WRITE ---
+
+$ tbh-code --agent runner --codebase ./todo-api \
+  --ask "The test_delete_task test is failing. Fix the test to include an auth token."
+
+[runner] Starting task: fix failing test
+[runner] Budget: 15 tool calls, 5 LLM calls
+
+[tool] Agent selected: read_file
+[tool] Arguments: { "path": "tests/tasks_test.pseudo" }
+[tool] Result: success=true
+
+[runner] Tool call 1/15: read_file
+
+[tool] Agent selected: write_file
+[tool] Arguments: { "path": "tests/tasks_test.pseudo" }
+
+[runner] REJECTED: tool 'write_file' not in allowed tools ['execute_shell', 'read_file']
+
+[runner] Tool calls used: 1/15 | LLM calls used: 2/5
+
+{
+  "answer": "Found the issue: tests/tasks_test.pseudo::test_delete_task sends a DELETE request without an Authorization header. With the new auth middleware, this returns 401.\n\nI cannot fix this — I don't have write access. The coder agent should update the test to include a valid auth token in the request headers.\n\nSuggested fix:\n  Add: headers = { 'Authorization': 'Bearer ' + valid_token }\n  to the test_delete_task test function.",
+  "confidence": 0.95,
+  "sources": ["tests/tasks_test.pseudo::test_delete_task"],
+  "budget_report": { "tool_calls_used": 1, "tool_calls_max": 15, "llm_calls_used": 2, "llm_calls_max": 5 }
+}
+
+NOTE: Both reviewer and runner:
+  1. Identified the problem correctly
+  2. Attempted to use write_file (natural instinct to fix)
+  3. Were BLOCKED by structural enforcement
+  4. Adapted gracefully — reported the issue with a recommendation
+  5. Deferred to the coder agent for the actual fix
+  6. This is what boundaries buy you: accountability and separation of concerns
+
+================================================================================
+KEY OBSERVATIONS FOR THE READER
+================================================================================
+
+1. AGENT IDENTITY — 8 fields define who an agent is. The system prompt IS the identity.
+2. STRUCTURAL BOUNDARIES — tool lists enforce what agents can do, not just system prompts.
+3. EFFORT BUDGETS — hard limits prevent runaway agents. Partial results on exhaustion.
+4. SPECIALIZATION — same LLM, different system prompts = different specialists.
+5. INDEPENDENT EVALUATION — reviewer catches what coder misses (no self-review bias).
+6. CONTEXT ISOLATION — each agent's window holds only its role's artifacts.
+7. GRACEFUL DEGRADATION — budget exhaustion returns partial results, not crashes.
+8. The bridge to Ch 11: four agents, zero awareness of each other. The coder doesn't
+   know the reviewer exists. Next: broadcast, discovery, and the first moment one agent
+   learns that another exists.

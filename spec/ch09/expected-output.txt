@@ -1,0 +1,413 @@
+================================================================================
+CHAPTER 9 — EXPECTED OUTPUT
+================================================================================
+
+SETUP:
+  Agent is pointed at the todo-api/ codebase.
+  All M2 + M3 capabilities active: tools, skills, memory, planning,
+  evaluation, guardrails.
+  Mistake journal initialized at .tbh-code/journal/
+  Self-improvement loop active.
+  Skills loaded with version tracking.
+
+================================================================================
+SESSION 1: MISTAKE JOURNAL — LOGGING FAILURES
+================================================================================
+
+$ tbh-code --codebase ./todo-api --auto-approve --ask "Fix the auth middleware to properly validate tokens"
+
+<agent plans, executes, evaluates...>
+
+--- EVALUATION ---
+
+[eval] Overall score: 0.55
+[eval] Correctness: 0.80 — Fix works, tokens validated
+[eval] Completeness: 0.55 — Missing edge cases
+[eval] Safety: 0.30 — Passwords compared with string equality (timing attack risk)
+[eval] FAILED (0.55 < 0.7)
+
+--- MISTAKE JOURNAL ---
+
+[journal] Logging mistake entry:
+  {
+    "task": "Fix auth middleware token validation",
+    "output": "Rewrote middleware with base64 decoding and user lookup",
+    "diagnosis": "Used string equality for token comparison. Vulnerable to timing attacks. Also missing test for expired tokens.",
+    "suggested_fix": "Use constant-time comparison for secrets. Add token expiration check.",
+    "category": "security",
+    "skill_used": "find-bug",
+    "eval_score": 0.55,
+    "timestamp": "2025-01-15T14:30:00Z"
+  }
+
+[journal] Entry saved: .tbh-code/journal/2025-01-15T14:30:00Z.json
+
+<agent escalates to user due to low score>
+
+NOTE: The mistake journal captures:
+  1. WHAT went wrong (diagnosis) — not just "it failed"
+  2. WHY it went wrong — timing attack via string equality
+  3. WHAT TO DO DIFFERENTLY — constant-time comparison
+  4. CATEGORY — "security" (enables pattern detection)
+  5. WHICH SKILL — "find-bug" (enables skill refinement)
+
+================================================================================
+SESSION 2: MISTAKE JOURNAL — MORE ENTRIES BUILD PATTERNS
+================================================================================
+
+$ tbh-code --codebase ./todo-api --auto-approve --ask "Add user registration with password storage"
+
+<agent plans, executes, evaluates...>
+
+[eval] Overall score: 0.57
+[eval] Safety: 0.30 — Passwords stored in plaintext
+
+[journal] Logging mistake entry:
+  {
+    "task": "Add user registration with password storage",
+    "output": "Created registration endpoint, passwords saved to DB",
+    "diagnosis": "Passwords stored as plaintext strings. No hashing applied. Critical security vulnerability.",
+    "suggested_fix": "Always hash passwords with bcrypt/argon2 before storage. Never store raw passwords.",
+    "category": "security",
+    "skill_used": null,
+    "eval_score": 0.57
+  }
+
+$ tbh-code --codebase ./todo-api --auto-approve --ask "Add input validation to POST /tasks"
+
+<agent plans, executes, evaluates...>
+
+[eval] Overall score: 0.65
+[eval] Completeness: 0.50 — Only validated title, missed other fields
+
+[journal] Logging mistake entry:
+  {
+    "task": "Add input validation to POST /tasks",
+    "output": "Added title length check to POST handler",
+    "diagnosis": "Only validated the title field mentioned in the task. Did not check completed field type or reject unknown fields.",
+    "suggested_fix": "When adding validation, validate ALL fields in request body, not just the one explicitly mentioned.",
+    "category": "incomplete",
+    "skill_used": null,
+    "eval_score": 0.65
+  }
+
+--- JOURNAL SUMMARY ---
+
+$ tbh-code --codebase ./todo-api --show-journal
+
+Mistake Journal (3 entries):
+
+  Categories:
+    security:   2 entries
+    incomplete: 1 entry
+
+  Recent entries:
+    1. [security] "Fix auth middleware" — timing attack via string equality
+    2. [security] "Add registration" — plaintext password storage
+    3. [incomplete] "Add validation" — only validated one field
+
+  Pattern detected: "security" category has 2+ entries.
+  Recommendation: Refine skills that touch security-related code.
+
+NOTE: The journal reveals a PATTERN:
+  1. Two security mistakes in a row — the agent keeps missing security concerns
+  2. Pattern detection triggers skill refinement recommendation
+  3. This is structured data, not a flat log — queryable and actionable
+
+================================================================================
+SESSION 3: SKILL REWRITING — FIND-BUG V1 → V2
+================================================================================
+
+$ tbh-code --codebase ./todo-api --auto-approve --ask "Review and improve the find-bug skill based on recent mistakes"
+
+[improve] Checking mistake journal for skill: find-bug
+[improve] Found 1 direct entry (skill_used: find-bug)
+[improve] Found 2 related entries (category: security)
+
+[improve] Current skill: find-bug v1
+  Step 1: Search for code related to the symptom
+  Step 2: Read the most relevant file
+  Step 3: Search for related tests
+  Step 4: Read the test file if found
+
+[improve] Refining skill based on 3 journal entries...
+
+[improve] Refined skill: find-bug v2
+  Step 1: Search for code related to the symptom
+  Step 2: Read the most relevant file
+  Step 3: Search for related tests
+  Step 4: Read the test file if found
+  Step 5: Search for similar patterns in other files        ← NEW
+           Reason: Past mistake — incomplete fixes that missed
+           similar issues in other files (from entry #3)
+  Step 6: Check fix for known security anti-patterns        ← NEW
+           - String equality for secrets → use constant-time
+           - Plaintext storage → use hashing
+           - eval()/exec() → avoid or sanitize input
+           Reason: 2 security mistakes in journal (entries #1, #2)
+
+  Version: 2
+  Parent: 1
+  Refinement reason: "2 security mistakes (timing attack, plaintext passwords) and 1 incomplete fix (missed similar patterns). Added security check step and cross-file search."
+
+[improve] Skill saved: .tbh-code/skills/find-bug-v2.json
+
+{
+  "answer": "Refined the find-bug skill from v1 to v2.\n\nChanges:\n- Added Step 5: Search for similar patterns in other files (addresses incomplete fixes)\n- Added Step 6: Check for security anti-patterns (addresses 2 security mistakes)\n\nThe skill now includes a security checklist based on past failures:\n- Constant-time comparison for secrets\n- Password hashing (never plaintext)\n- No eval()/exec() on user input\n\nNext: verify the improvement with a test task.",
+  "confidence": 0.9,
+  "sources": [".tbh-code/skills/find-bug-v2.json", ".tbh-code/journal/"]
+}
+
+NOTE: Skill evolution in action:
+  1. Agent read its OWN skill spec
+  2. Queried the mistake journal for relevant failures
+  3. Produced a v2 with two NEW steps addressing specific past mistakes
+  4. Each new step cites which mistake it addresses
+  5. The skill is now a LIVING DOCUMENT — it improves over time
+
+================================================================================
+SESSION 4: EVALUATOR-OPTIMIZER LOOP — ITERATIVE CONVERGENCE
+================================================================================
+
+$ tbh-code --codebase ./todo-api --auto-approve --ask "Do a thorough code review of the auth routes — check for bugs, security issues, and missing error handling"
+
+[eval-opt] Starting evaluator-optimizer loop (max 3 rounds, threshold 0.8)
+
+--- Round 1 ---
+
+[eval-opt] Round 1: Executing approach...
+[think] Reviewing auth routes for bugs, security, and error handling.
+[tool] Agent selected: read_file
+[tool] Arguments: { "path": "src/routes/auth.pseudo" }
+[tool] Result: success=true
+
+[eval-opt] Round 1: Evaluating...
+[eval] Correctness: 0.70 — Found the token generation issue but missed input validation
+[eval] Completeness: 0.50 — Only reviewed auth.pseudo, not related middleware
+[eval] Safety: 0.60 — Noted plaintext token but missed rate limiting absence
+
+[eval-opt] Round 1: score 0.60 (below threshold 0.8)
+
+[eval-opt] Optimizer adjusting approach:
+  Issues: "Only reviewed one file, missed middleware, no rate limiting check"
+  Focus: completeness (lowest at 0.50)
+  Adjustment: "Review all auth-related files. Check middleware. Check for rate limiting."
+
+--- Round 2 ---
+
+[eval-opt] Round 2: Executing adjusted approach...
+[tool] Agent selected: search_code
+[tool] Arguments: { "pattern": "auth\\|token\\|login\\|password", "path": "src/" }
+[tool] Result: success=true
+
+[tool] Agent selected: read_file
+[tool] Arguments: { "path": "src/middleware/auth.pseudo" }
+[tool] Result: success=true
+
+[tool] Agent selected: read_file
+[tool] Arguments: { "path": "src/routes/auth.pseudo" }
+[tool] Result: success=true
+
+[eval-opt] Round 2: Evaluating...
+[eval] Correctness: 0.80 — Found token issue, input validation gap, middleware bug
+[eval] Completeness: 0.70 — Reviewed auth routes + middleware, still missing DB layer
+[eval] Safety: 0.75 — Noted plaintext token, missing rate limit, no account lockout
+
+[eval-opt] Round 2: score 0.75 (below threshold 0.8)
+
+[eval-opt] Optimizer adjusting approach:
+  Issues: "Missing DB layer review, no account lockout detection"
+  Focus: completeness (still lowest at 0.70)
+  Adjustment: "Also review db.pseudo for auth queries. Check for lockout mechanism."
+
+--- Round 3 ---
+
+[eval-opt] Round 3: Executing adjusted approach...
+[tool] Agent selected: read_file
+[tool] Arguments: { "path": "src/db.pseudo" }
+[tool] Result: success=true
+
+[eval-opt] Round 3: Evaluating...
+[eval] Correctness: 0.85 — Comprehensive bug list across all auth files
+[eval] Completeness: 0.85 — All auth-related files reviewed, DB queries checked
+[eval] Safety: 0.80 — All security issues cataloged with severity ratings
+
+[eval-opt] Round 3: score 0.83 (meets threshold 0.8)
+[eval-opt] Threshold met. Done.
+
+[eval-opt] Score history: [0.60, 0.75, 0.83]
+
+{
+  "answer": "Code review of auth routes completed (3 rounds of refinement).\n\nFiles reviewed: src/routes/auth.pseudo, src/middleware/auth.pseudo, src/db.pseudo\n\nFindings:\n\n**Bugs:**\n1. Token generation uses base64 encoding without signing — tokens can be forged\n2. No input validation on register/login request bodies\n3. find_user query doesn't handle SQL injection\n\n**Security Issues (High):**\n1. Passwords stored as plaintext in DB — need bcrypt hashing\n2. No rate limiting on login endpoint — brute force possible\n3. No account lockout after failed attempts\n4. Auth tokens don't expire\n\n**Security Issues (Medium):**\n5. Error messages reveal internal details ('user not found' vs generic 401)\n6. No CSRF protection on auth forms\n\n**Missing Error Handling:**\n7. DB connection failure not caught in auth routes\n8. No try/catch around token decode in middleware\n\nSelf-evaluation: 0.83/1.0 (converged in 3 rounds from 0.60)",
+  "confidence": 0.83,
+  "sources": [
+    "src/routes/auth.pseudo",
+    "src/middleware/auth.pseudo",
+    "src/db.pseudo"
+  ],
+  "evaluation": {
+    "score": 0.83,
+    "rounds": 3,
+    "score_history": [0.60, 0.75, 0.83]
+  }
+}
+
+NOTE: Evaluator-optimizer loop in action:
+  1. Round 1: superficial review, low score (0.60)
+  2. Round 2: broader review after optimizer feedback, better score (0.75)
+  3. Round 3: comprehensive review, meets threshold (0.83)
+  4. Score IMPROVED each round — the optimizer addressed specific weaknesses
+  5. The agent did NOT just retry the same thing — each round had a different focus
+  6. Score history visible — the reader sees convergence
+
+================================================================================
+SESSION 5: USER FEEDBACK → BEHAVIORAL RULE
+================================================================================
+
+$ tbh-code --codebase ./todo-api --ask "Write tests for the auth middleware"
+
+<agent writes tests using mock functions>
+
+{
+  "answer": "Added 4 tests for auth middleware using mock request/response objects..."
+}
+
+> Don't use mocks in the tests — use the real database layer.
+
+[feedback] Extracting behavioral rule from user feedback...
+[feedback] Stored rule:
+  {
+    "key": "rule/no-mocks-in-tests",
+    "content": "Use real implementations instead of mocks in tests. Write integration-style tests that exercise the actual database layer and middleware stack.",
+    "type": "rule",
+    "tags": ["testing", "user-feedback", "behavioral-rule", "integration-tests"],
+    "timestamp": "2025-01-18T11:00:00Z"
+  }
+[feedback] Rule applies to: tasks involving writing tests
+[feedback] Reason: User prefers integration-style tests over unit tests with mocks
+
+> OK, now rewrite the tests following that rule.
+
+[memory] Retrieved rule: "Use real implementations instead of mocks in tests"
+[memory] Applying rule to current task...
+
+<agent rewrites tests using real DB layer>
+
+{
+  "answer": "Rewrote the auth middleware tests using the real database layer instead of mocks.\n\nChanges:\n- Replaced mock_request/mock_response with actual HTTP request helpers\n- Tests now create real users in the database before testing auth\n- Tests clean up database state after each test\n- Added setup/teardown for database connection\n\nThis follows the rule: 'Use real implementations instead of mocks in tests.'",
+  "confidence": 0.9,
+  "sources": ["tests/middleware_test.pseudo"]
+}
+
+--- NEXT SESSION: RULE IS REMEMBERED ---
+
+$ tbh-code --codebase ./todo-api --ask "Write tests for the rate limiter middleware"
+
+[memory] Retrieved rules for task "write tests":
+  1. [rule] "Use real implementations instead of mocks in tests"
+
+[think] Step 1: I have a rule from user feedback — no mocks, use real
+        implementations. I'll write integration-style tests from the start.
+
+<agent writes tests using real middleware stack, no mocks>
+
+{
+  "answer": "Added 3 tests for rate limiter middleware using the real middleware stack (no mocks, per your preference)...",
+  "confidence": 0.9,
+  "sources": ["tests/rate_limit_test.pseudo"]
+}
+
+NOTE: User feedback loop:
+  1. User correction extracted as a RULE, not just remembered as chat
+  2. Rule is TAGGED so it's retrieved for testing tasks
+  3. In the NEXT session (different task), rule was automatically retrieved
+  4. Agent followed the rule WITHOUT being reminded
+  5. This is behavioral change, not just memory — the agent acts differently
+
+================================================================================
+SESSION 6: IMPROVEMENT VERIFICATION — BEFORE/AFTER
+================================================================================
+
+$ tbh-code --codebase ./todo-api --auto-approve --ask "Verify that the find-bug skill v2 is better than v1"
+
+[improve] Verifying skill refinement: find-bug v1 → v2
+
+--- BEFORE (v1) ---
+
+[improve] Running evaluation with find-bug v1...
+[improve] Task: "Find and fix the auth middleware bug"
+[improve] Using skill: find-bug v1 (4 steps)
+
+<execution with v1>
+
+[eval] Overall score: 0.72
+[eval] Correctness: 0.80, Completeness: 0.65, Safety: 0.70
+[improve] Before metrics: { overall: 0.72, correctness: 0.80, completeness: 0.65, safety: 0.70 }
+
+--- AFTER (v2) ---
+
+[improve] Running evaluation with find-bug v2...
+[improve] Task: "Find and fix the auth middleware bug"
+[improve] Using skill: find-bug v2 (6 steps)
+
+<execution with v2 — includes security check and cross-file search>
+
+[eval] Overall score: 0.85
+[eval] Correctness: 0.85, Completeness: 0.80, Safety: 0.90
+[improve] After metrics: { overall: 0.85, correctness: 0.85, completeness: 0.80, safety: 0.90 }
+
+--- VERIFICATION ---
+
+[improve] Comparing before/after:
+  Overall:      0.72 → 0.85  (+0.13)  IMPROVED
+  Correctness:  0.80 → 0.85  (+0.05)  UNCHANGED (within threshold)
+  Completeness: 0.65 → 0.80  (+0.15)  IMPROVED
+  Safety:       0.70 → 0.90  (+0.20)  IMPROVED
+
+[improve] Degraded criteria: none
+[improve] Recommendation: KEEP v2
+
+[improve] Verification result:
+  {
+    "improved": true,
+    "overall_delta": 0.13,
+    "improved_criteria": [
+      { "name": "completeness", "before": 0.65, "after": 0.80, "delta": 0.15 },
+      { "name": "safety", "before": 0.70, "after": 0.90, "delta": 0.20 }
+    ],
+    "degraded_criteria": [],
+    "unchanged_criteria": [
+      { "name": "correctness", "before": 0.80, "after": 0.85, "delta": 0.05 }
+    ],
+    "recommendation": "keep"
+  }
+
+[improve] find-bug v2 is the active version.
+
+{
+  "answer": "Verified that find-bug v2 is better than v1.\n\nResults:\n- Overall score improved from 0.72 to 0.85 (+0.13)\n- Completeness improved most (+0.15) — the cross-file search step caught issues v1 missed\n- Safety improved significantly (+0.20) — the security anti-pattern check caught timing attacks and plaintext storage\n- No criteria degraded\n\nfind-bug v2 is now the active version.",
+  "confidence": 0.95,
+  "sources": [".tbh-code/skills/find-bug-v2.json"]
+}
+
+NOTE: Improvement verification:
+  1. Agent ran the SAME task with v1 and v2
+  2. Compared scores across ALL criteria
+  3. Verified no criteria DEGRADED (important — improvement shouldn't trade off)
+  4. The improvement is MEASURABLE — not just "feels better"
+  5. If v2 had been worse, agent would ROLL BACK to v1
+  6. This is the complete self-improvement loop:
+     evaluate → diagnose → adapt → VERIFY
+
+================================================================================
+KEY OBSERVATIONS FOR THE READER
+================================================================================
+
+1. MISTAKE JOURNAL — structured failure log with categories, not a flat log
+2. PATTERN DETECTION — "security" category with 2+ entries triggers refinement
+3. SKILL REWRITING — agent rewrites its OWN skills based on past failures
+4. EVALUATOR-OPTIMIZER — iterative convergence from 0.60 → 0.83 in 3 rounds
+5. USER FEEDBACK → RULES — corrections persist as behavioral rules across sessions
+6. VERIFICATION — before/after metrics prove improvement is real
+7. ROLLBACK — if adaptation doesn't help, previous version is restored
+8. The bridge to Ch 10: the agent improves itself, but it's one monolith doing everything. What if the evaluator and optimizer were separate agents?

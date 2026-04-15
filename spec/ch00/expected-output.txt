@@ -1,0 +1,86 @@
+================================================================================
+CHAPTER 0 — EXPECTED OUTPUT
+================================================================================
+
+SETUP:
+  Reader has Python 3.10+, an API key, and the book repo cloned.
+
+================================================================================
+STEP 1: CREATE PROJECT
+================================================================================
+
+$ mkdir tbh-code && cd tbh-code
+$ python3 -m venv .venv
+$ source .venv/bin/activate
+$ pip install anthropic
+
+...
+Successfully installed anthropic-x.x.x ...
+
+$ mkdir -p tbh_code
+$ touch tbh_code/__init__.py
+
+================================================================================
+STEP 2: COPY TODO-API
+================================================================================
+
+$ cp -r /path/to/book-repo/spec/todo-api ./todo-api
+
+$ ls todo-api/src/
+main.pseudo  routes/  models/  middleware/  db.pseudo
+
+$ ls todo-api/tests/
+tasks_test.pseudo  auth_test.pseudo
+
+================================================================================
+STEP 3: VERIFY STRUCTURE
+================================================================================
+
+$ find . -type f | head -20
+./smoke_test.py
+./tbh_code/__init__.py
+./todo-api/README.md
+./todo-api/src/main.pseudo
+./todo-api/src/db.pseudo
+./todo-api/src/routes/tasks.pseudo
+./todo-api/src/routes/auth.pseudo
+./todo-api/src/middleware/auth.pseudo
+./todo-api/src/models/task.pseudo
+./todo-api/src/models/user.pseudo
+./todo-api/tests/tasks_test.pseudo
+./todo-api/tests/auth_test.pseudo
+
+================================================================================
+STEP 4: SMOKE TEST
+================================================================================
+
+$ python smoke_test.py
+tbh-code ready
+
+NOTE: The exact response may vary slightly ("tbh-code ready", "tbh-code ready.",
+"tbh-code ready!") — the validation test checks for "tbh-code ready" as a
+substring, case-insensitive.
+
+================================================================================
+COMMON ERRORS
+================================================================================
+
+ERROR: AuthenticationError
+  → API key not set. Run: export ANTHROPIC_API_KEY="sk-ant-..."
+
+ERROR: ModuleNotFoundError: No module named 'anthropic'
+  → SDK not installed. Run: pip install anthropic
+  → Or virtual environment not activated. Run: source .venv/bin/activate
+
+ERROR: ConnectionError
+  → No internet. Or if using Ollama, it's not running: ollama serve
+
+================================================================================
+EXIT CRITERIA
+================================================================================
+
+✓ python3 --version → 3.10+
+✓ pip list shows anthropic or openai
+✓ todo-api/ has ~10 .pseudo files
+✓ python smoke_test.py → "tbh-code ready"
+✓ No API keys in any source file

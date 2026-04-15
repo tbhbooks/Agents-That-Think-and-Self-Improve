@@ -1,0 +1,371 @@
+================================================================================
+CHAPTER 8 — EXPECTED OUTPUT
+================================================================================
+
+SETUP:
+  Agent is pointed at the todo-api/ codebase.
+  Tools registered: read_file, list_files, search_code, write_file,
+                    delete_file, execute_shell.
+  Skills loaded: find-bug, add-endpoint, document-function.
+  Memory, session, planning active.
+  Evaluator active (threshold: 0.7).
+  Guardrails active: no_secrets_in_code, no_destructive_without_gate,
+                     no_known_vulnerabilities.
+
+================================================================================
+SESSION 1: EVALUATION PASSES — AGENT CATCHES ISSUE, FIXES IT
+================================================================================
+
+$ tbh-code --codebase ./todo-api --auto-approve --ask "Fix the auth middleware to properly validate tokens and run the tests"
+
+Loading codebase from ./todo-api ...
+  Registered 6 tools + 3 skills
+  Evaluator: active (threshold: 0.7)
+  Guardrails: 3 active
+
+[plan] Decomposing task: "Fix the auth middleware to properly validate tokens"
+[plan] Generated plan (5 steps):
+  Step 1: Read auth middleware                    [read_file]
+  Step 2: Read auth routes (token generation)     [read_file]
+  Step 3: Write fixed middleware                  [write_file]
+  Step 4: Write middleware tests                  [write_file]
+  Step 5: Run tests                              [execute_shell]
+
+[plan] Executing...
+
+[think] Step 1: Need to see the current buggy middleware.
+[tool] Agent selected: read_file
+[tool] Arguments: { "path": "src/middleware/auth.pseudo" }
+[tool] Result: success=true
+[plan] Step 1 completed
+
+[think] Step 2: Need to understand how tokens are generated to validate them correctly.
+[tool] Agent selected: read_file
+[tool] Arguments: { "path": "src/routes/auth.pseudo" }
+[tool] Result: success=true
+[plan] Step 2 completed
+
+[think] Step 3: Writing the fix — decode base64 token, look up user, reject invalid.
+[tool] Agent selected: write_file
+[tool] Arguments: { "path": "src/middleware/auth.pseudo", "content": "<fixed middleware>" }
+[guardrail] no_secrets_in_code: PASSED (no secrets detected)
+[guardrail] no_known_vulnerabilities: PASSED (no vulnerability patterns)
+[gate] Approved (auto-approve)
+[tool] Result: success=true
+[plan] Step 3 completed
+
+[think] Step 4: Writing tests for missing token, invalid token, valid token.
+[tool] Agent selected: write_file
+[tool] Arguments: { "path": "tests/middleware_test.pseudo", "content": "<test file>" }
+[guardrail] no_secrets_in_code: PASSED
+[gate] Approved (auto-approve)
+[tool] Result: success=true
+[plan] Step 4 completed
+
+[think] Step 5: Running tests to verify the fix.
+[tool] Agent selected: execute_shell
+[tool] Arguments: { "command": "run-tests tests/", "timeout": 30 }
+[guardrail] no_destructive_without_gate: PASSED (not destructive)
+[gate] Approved (auto-approve)
+[tool] Result: success=true
+  { "stdout": "8 passed, 0 failed", "exit_code": 0 }
+[plan] Step 5 completed
+[plan] Plan completed: 5/5 steps succeeded
+
+--- EVALUATION ---
+
+[eval] Evaluating output against criteria...
+[eval] Correctness: 0.90
+  "The fix correctly decodes base64 tokens, looks up users in the database,
+   and rejects missing or malformed tokens. All 8 tests pass."
+[eval] Completeness: 0.80
+  "Covers main cases: missing token, invalid format, valid token.
+   Missing: no test for empty string token vs null header."
+[eval] Safety: 0.85
+  "No hardcoded secrets. Token validation uses proper decoding.
+   Minor: error messages could leak implementation details
+   ('base64 decode failed' vs generic '401 Unauthorized')."
+
+[eval] Overall score: 0.85
+[eval] PASSED (0.85 >= 0.7)
+
+[eval] Issues:
+  - No test for empty string token (distinct from missing header)
+  - Error messages expose internal details ("base64 decode failed")
+
+[eval] Suggestions:
+  - Add test case for empty string Authorization header
+  - Return generic "401 Unauthorized" instead of specific decode errors
+
+[memory] Saving diagnostic: todo-api/auth-fix-eval
+  {
+    "task": "Fix auth middleware token validation",
+    "score": 0.85,
+    "issues": ["No empty-string token test", "Verbose error messages"],
+    "suggestions": ["Add empty-string test", "Generic error responses"]
+  }
+
+{
+  "answer": "Fixed the auth middleware. Token validation now decodes base64, looks up users, and rejects invalid tokens. All 8 tests pass.\n\nSelf-evaluation (score: 0.85/1.0):\n- Correctness: 0.90 — fix works correctly\n- Completeness: 0.80 — covers main cases, could add edge case test\n- Safety: 0.85 — no secrets, but error messages could be more generic\n\nMinor suggestions: add empty-string token test, use generic error messages.",
+  "confidence": 0.85,
+  "sources": ["src/middleware/auth.pseudo", "tests/middleware_test.pseudo"],
+  "evaluation": {
+    "score": 0.85,
+    "passed": true,
+    "criteria": { "correctness": 0.9, "completeness": 0.8, "safety": 0.85 }
+  }
+}
+
+NOTE: Key evaluation behaviors:
+  1. Evaluation ran AFTER plan execution — separate phase
+  2. Three criteria scored independently with explanations
+  3. Overall score computed, compared to threshold
+  4. Issues identified even though evaluation PASSED
+  5. Suggestions are actionable — specific things to improve
+  6. Diagnostic saved to memory for Ch 9
+
+================================================================================
+SESSION 2: GUARDRAIL BLOCKS SECRET IN CODE
+================================================================================
+
+$ tbh-code --codebase ./todo-api --auto-approve --ask "Add a config file with the database connection string and API key"
+
+[plan] Decomposing task: "Add config file with connection string and API key"
+[plan] Generated plan (2 steps):
+  Step 1: Write config file with connection details     [write_file]
+  Step 2: Update main.pseudo to read config             [write_file]
+
+[plan] Executing...
+
+[think] Step 1: Writing a config file with database and API settings.
+[tool] Agent selected: write_file
+[tool] Arguments: {
+  "path": "config.pseudo",
+  "content": "# Application Config\n\ndb_host: localhost\ndb_port: 5432\ndb_name: todo_app\napi_key: 'sk-a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6'\nsecret: 'my_jwt_secret_key_2024'\n"
+}
+
+[guardrail] BLOCKED by no_secrets_in_code:
+  Hardcoded secret detected: matches pattern '(api[_-]?key)\s*[:=]\s*['\"][a-zA-Z0-9]{20,}'
+  Found: api_key: 'sk-a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6'
+
+[tool] Result: success=false, error="Action blocked by guardrail: no_secrets_in_code"
+
+[plan] Step 1 BLOCKED by guardrail
+
+{
+  "answer": "I was about to write a config file with hardcoded API keys and secrets, but the guardrail blocked it. Hardcoded secrets in source files are a security risk.\n\nInstead, I recommend:\n1. Use environment variables for sensitive values\n2. Create a config.pseudo with placeholder references:\n   api_key: env('API_KEY')\n   secret: env('JWT_SECRET')\n3. Add a .env.example with the variable names (no values)\n4. Add .env to .gitignore\n\nWant me to create the config using environment variables instead?",
+  "confidence": 0.95,
+  "sources": []
+}
+
+NOTE: Guardrail protection:
+  1. Agent tried to write a file with hardcoded secrets
+  2. no_secrets_in_code guardrail detected the pattern
+  3. Write was BLOCKED — file was NOT created
+  4. Agent recovered gracefully — suggested the correct approach
+  5. This is different from action gates (Ch 5): guardrails are automatic,
+     not user-prompted. The user never had to say "no."
+
+================================================================================
+SESSION 3: EVALUATION FAILS — ESCALATION TO HUMAN
+================================================================================
+
+$ tbh-code --codebase ./todo-api --ask "Add user registration with password storage"
+
+[plan] Decomposing task: "Add user registration with password storage"
+[plan] Generated plan (4 steps):
+  Step 1: Read current auth routes              [read_file]
+  Step 2: Write updated registration handler    [write_file]
+  Step 3: Write registration tests              [write_file]
+  Step 4: Run tests                             [execute_shell]
+
+[plan] Executing...
+
+<steps 1-4 execute, tests pass>
+
+[plan] Plan completed: 4/4 steps succeeded
+
+--- EVALUATION ---
+
+[eval] Evaluating output against criteria...
+[eval] Correctness: 0.80
+  "Registration endpoint works. User is saved to database. Tests pass."
+[eval] Completeness: 0.60
+  "Basic registration works, but missing: email validation, duplicate
+   username check, password strength requirements."
+[eval] Safety: 0.30
+  "CRITICAL: Passwords are stored in PLAINTEXT. No hashing applied.
+   The save_user function stores the raw password string. This is a
+   major security vulnerability."
+
+[eval] Overall score: 0.57
+[eval] FAILED (0.57 < 0.7)
+
+[eval] Issues:
+  - Passwords stored in plaintext (critical security flaw)
+  - No duplicate username check (will crash on conflict)
+  - No password strength validation
+  - No email format validation
+
+[eval] Suggestions:
+  - Hash passwords with bcrypt before storing
+  - Check for existing username before insert
+  - Require minimum password length (8+ chars)
+  - Validate email format if email field exists
+
+[escalate] I'm not confident in this output. Score: 0.57/1.0
+
+  CRITICAL ISSUE: Passwords are stored in plaintext.
+
+  What I completed:
+  - Registration endpoint at POST /auth/register
+  - User saved to database
+  - 2 tests passing
+
+  What's wrong:
+  1. Passwords are NOT hashed — stored as plaintext (safety: 0.3)
+  2. No duplicate username detection
+  3. No password strength check
+
+  Options:
+    1. Let me fix the security issues (recommended)
+    2. Accept as-is (NOT recommended — security risk)
+    3. Cancel and discard changes
+
+  > _
+
+NOTE: Fail-closed in action:
+  1. Agent completed the task — tests pass, code works
+  2. But evaluation caught a CRITICAL safety issue: plaintext passwords
+  3. Score dropped below threshold (0.57 < 0.7)
+  4. Agent STOPPED and ESCALATED instead of presenting bad work
+  5. Escalation shows what's done, what's wrong, and options
+  6. The agent recommends fixing, not accepting
+  7. Without evaluation, the agent would have said "Done!" with a security flaw
+
+================================================================================
+SESSION 4: GUARDRAIL BLOCKS DESTRUCTIVE COMMAND
+================================================================================
+
+$ tbh-code --codebase ./todo-api --ask "Clean up the project by removing all temporary files"
+
+[plan] Decomposing task: "Clean up temporary files"
+[plan] Generated plan (2 steps):
+  Step 1: Find temporary files                   [search_code]
+  Step 2: Remove temporary files                  [execute_shell]
+
+[plan] Executing...
+
+[think] Step 1: Searching for temporary files.
+[tool] Agent selected: list_files
+[tool] Arguments: { "path": ".", "recursive": true }
+[tool] Result: success=true
+[plan] Step 1 completed
+
+[think] Step 2: Removing the temporary test files created during testing.
+[tool] Agent selected: execute_shell
+[tool] Arguments: { "command": "rm -rf tests/_test_* config.pseudo" }
+
+[guardrail] BLOCKED by no_destructive_without_gate:
+  Destructive command detected: 'rm -rf' in 'rm -rf tests/_test_* config.pseudo'
+
+[tool] Result: success=false, error="Action blocked by guardrail: no_destructive_without_gate"
+
+[plan] Step 2 BLOCKED by guardrail
+
+{
+  "answer": "I found temporary files to clean up, but the `rm -rf` command was blocked by a safety guardrail. Instead, I can delete specific files one at a time using the delete_file tool, which is safer and more controlled.\n\nFiles to clean up:\n- tests/_test_ch05_temp.pseudo\n- tests/_test_ch05_content.pseudo\n- config.pseudo\n\nWant me to delete them individually with confirmation for each?",
+  "confidence": 0.9,
+  "sources": []
+}
+
+NOTE: The guardrail caught `rm -rf` even with a seemingly reasonable use case.
+The agent adapted — suggested using delete_file (individual, gated) instead
+of bulk shell deletion. Defense in depth.
+
+================================================================================
+SESSION 5: DIAGNOSTIC FEEDBACK WITH SPECIFIC SUGGESTIONS
+================================================================================
+
+$ tbh-code --codebase ./todo-api --auto-approve --ask "Refactor the database layer to use connection pooling"
+
+[plan] Decomposing task: "Refactor database layer to use connection pooling"
+[plan] Generated plan (5 steps):
+  Step 1: Read current db.pseudo                [read_file]
+  Step 2: Research connection pool patterns      [search_code]
+  Step 3: Write pooled database layer            [write_file]
+  Step 4: Update routes to use pool              [write_file]
+  Step 5: Run tests                              [execute_shell]
+
+<steps execute, tests pass>
+
+--- EVALUATION ---
+
+[eval] Evaluating output against criteria...
+[eval] Correctness: 0.70
+  "Connection pool implemented with max connections and timeout.
+   But pool doesn't handle connection failures gracefully —
+   if a connection drops, it's not removed from the pool."
+[eval] Completeness: 0.65
+  "Pool creation and basic checkout/checkin works.
+   Missing: connection health checks, pool drain on shutdown,
+   connection timeout configuration."
+[eval] Safety: 0.80
+  "No secrets exposed. Connections properly closed.
+   Pool size is configurable (good)."
+
+[eval] Overall score: 0.72
+[eval] PASSED (0.72 >= 0.7) — barely
+
+[eval] Diagnostic:
+  {
+    "task": "Refactor database layer to use connection pooling",
+    "output_summary": "Replaced direct DB connections with pool of 10 reusable connections",
+    "score": 0.72,
+    "issues": [
+      "Dead connections not evicted from pool",
+      "No health check on checkout",
+      "No graceful shutdown (pool drain)",
+      "Connection timeout not configurable"
+    ],
+    "suggestions": [
+      "Add connection.isAlive() check before returning from pool",
+      "Implement pool.drain() for graceful shutdown",
+      "Make timeout configurable via config (default: 30s)",
+      "Add periodic health check sweep (every 60s, remove dead connections)"
+    ],
+    "criteria_scores": { "correctness": 0.70, "completeness": 0.65, "safety": 0.80 }
+  }
+
+[memory] Saving diagnostic: todo-api/connection-pool-eval
+
+{
+  "answer": "Refactored the database layer to use connection pooling. Basic implementation works — pool of 10 reusable connections with checkout/checkin.\n\nSelf-evaluation (score: 0.72/1.0 — passed, barely):\n- Correctness: 0.70 — works but doesn't handle dead connections\n- Completeness: 0.65 — missing health checks and graceful shutdown\n- Safety: 0.80 — no security issues\n\nKnown gaps:\n- Dead connections stay in pool (should add health checks)\n- No graceful shutdown (pool.drain())\n- Timeout not configurable\n\nThese are improvement opportunities for the next iteration.",
+  "confidence": 0.72,
+  "sources": ["src/db.pseudo"],
+  "evaluation": {
+    "score": 0.72,
+    "passed": true,
+    "criteria": { "correctness": 0.70, "completeness": 0.65, "safety": 0.80 }
+  }
+}
+
+NOTE: Diagnostic feedback details:
+  1. Score barely passed (0.72) — agent reported this honestly
+  2. Issues are SPECIFIC — "dead connections not evicted", not just "incomplete"
+  3. Suggestions are ACTIONABLE — "add connection.isAlive() check"
+  4. Diagnostic saved to memory — Ch 9 can use this to improve the agent
+  5. Agent reported gaps in its OWN answer — transparency over confidence
+
+================================================================================
+KEY OBSERVATIONS FOR THE READER
+================================================================================
+
+1. SELF-EVALUATION — agent scores its own output on 3 criteria before presenting
+2. GUARDRAILS — hard rules that block unconditionally (secrets, destructive commands)
+3. FAIL-CLOSED — low scores trigger escalation, not silent delivery
+4. ESCALATION — human gets context (what's done, what's wrong, options)
+5. DIAGNOSTIC FEEDBACK — specific issues + actionable suggestions
+6. GUARDRAILS vs GATES — guardrails are automatic (no prompt), gates ask permission
+7. EVALUATION vs TESTING — tests check "does it run?", evaluation checks "is it good?"
+8. The bridge to Ch 9: diagnostics are logged but don't change behavior — the agent will make the same mistakes again next session

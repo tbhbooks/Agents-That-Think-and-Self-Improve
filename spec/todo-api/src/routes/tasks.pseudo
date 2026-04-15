@@ -1,0 +1,66 @@
+# Task routes
+# INTENTIONAL ISSUES:
+#   1. list_tasks has N+1 query (loads tags one-by-one) — used in Ch 7, Ch 9
+#   2. create_task has no input validation — used in Ch 8
+#   3. delete_task has no test — used in Ch 5
+
+function task_routes(db):
+    router = new Router()
+
+    # GET /tasks — list all tasks
+    # BUG: N+1 query — loads tags in a loop instead of a join
+    router.get("/", fn(req, res):
+        tasks = db.query("SELECT * FROM tasks WHERE user_id = ?", req.user.id)
+        for task in tasks:
+            task.tags = db.query("SELECT * FROM tags WHERE task_id = ?", task.id)  # N+1!
+        res.json(tasks)
+    )
+
+    # POST /tasks — create a task
+    # BUG: No input validation — title could be empty, due_date could be garbage
+    router.post("/", fn(req, res):
+        task = db.insert("tasks", {
+            title: req.body.title,          # no validation!
+            description: req.body.description,
+            due_date: req.body.due_date,    # no format check!
+            status: "pending",
+            user_id: req.user.id
+        })
+        res.status(201).json(task)
+    )
+
+    # GET /tasks/:id — get one task
+    router.get("/:id", fn(req, res):
+        task = db.query_one("SELECT * FROM tasks WHERE id = ? AND user_id = ?",
+                            req.params.id, req.user.id)
+        if task == null:
+            res.status(404).json({ error: "task not found" })
+            return
+        task.tags = db.query("SELECT * FROM tags WHERE task_id = ?", task.id)
+        res.json(task)
+    )
+
+    # PUT /tasks/:id — update a task
+    router.put("/:id", fn(req, res):
+        updated = db.update("tasks",
+            { title: req.body.title, description: req.body.description,
+              due_date: req.body.due_date, status: req.body.status },
+            "id = ? AND user_id = ?", req.params.id, req.user.id)
+        if updated == 0:
+            res.status(404).json({ error: "task not found" })
+            return
+        res.json({ ok: true })
+    )
+
+    # DELETE /tasks/:id — delete a task
+    # NOTE: No test exists for this endpoint — used in Ch 5
+    router.delete("/:id", fn(req, res):
+        deleted = db.delete("tasks", "id = ? AND user_id = ?",
+                            req.params.id, req.user.id)
+        if deleted == 0:
+            res.status(404).json({ error: "task not found" })
+            return
+        res.json({ ok: true })
+    )
+
+    return router

@@ -1,0 +1,26 @@
+# todo-api entry point
+# Language-agnostic pseudocode — the reader implements in their chosen language
+
+import { create_server, json_middleware } from "http"
+import { task_routes } from "./routes/tasks"
+import { auth_routes } from "./routes/auth"
+import { auth_middleware } from "./middleware/auth"
+import { connect_db } from "./db"
+
+function main():
+    db = connect_db("./data/todos.db")
+
+    server = create_server()
+    server.use(json_middleware())
+
+    # Public routes (no auth required)
+    server.mount("/auth", auth_routes(db))
+
+    # Protected routes (auth required)
+    server.use("/tasks", auth_middleware())
+    server.mount("/tasks", task_routes(db))
+
+    server.listen(3000)
+    print("todo-api running on :3000")
+
+main()

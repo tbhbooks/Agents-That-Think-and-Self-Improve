@@ -1,0 +1,18 @@
+# Auth middleware
+# INTENTIONAL BUG: Accepts ANY non-empty token as valid
+# The token should be verified (signature, expiry, user exists) — but it isn't.
+# This is the primary bug used in Ch 1 (one-shot fails to find it) and Ch 2 (agent finds it).
+
+function auth_middleware():
+    return fn(req, res, next):
+        token = req.headers["authorization"]
+
+        if token == null or token == "":
+            res.status(401).json({ error: "missing token" })
+            return
+
+        # BUG: No actual validation!
+        # Should: decode token, verify signature, check expiry, look up user
+        # Actually: just checks the token is non-empty
+        req.user = { id: 1, username: "unknown" }  # hardcoded! always "user 1"
+        next()

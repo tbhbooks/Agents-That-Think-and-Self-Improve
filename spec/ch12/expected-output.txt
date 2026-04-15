@@ -1,0 +1,479 @@
+================================================================================
+CHAPTER 12 — EXPECTED OUTPUT
+================================================================================
+
+SETUP:
+  Swarm running with agents: coder, reviewer, runner, researcher.
+  All agents discovered via broadcast bus (Ch 11).
+  Peer communication active: message envelopes, request/response,
+  streaming, artifact handoffs, correlation IDs.
+  All prior capabilities (Ch 1-11) active.
+
+================================================================================
+SESSION 1: REQUEST/RESPONSE — CODER ASKS REVIEWER
+================================================================================
+
+$ tbh-code --agent coder --codebase ./todo-api --auto-approve \
+  --ask "Fix the auth middleware and get it reviewed"
+
+[coder] Task: Fix auth middleware vulnerability and get it reviewed.
+[coder] Reading src/middleware/auth.pseudo...
+[coder] Checking mistake journal for auth-related entries...
+[journal] Found: "Used string equality for token comparison — timing attack"
+[journal] Suggested fix: "Use constant-time comparison for secrets"
+
+[coder] Writing fix with constant-time comparison (journal recommendation).
+[coder] Fix applied to src/middleware/auth.pseudo.
+
+[coder] Starting chain for review request.
+[coder] correlation_id: chain-abc
+
+[coder] Sending message:
+  {
+    "id": "msg-001",
+    "from": "coder",
+    "to": "reviewer",
+    "type": "request",
+    "correlation_id": "chain-abc",
+    "payload": {
+      "action": "review_code",
+      "diff": "--- a/src/middleware/auth.pseudo\n+++ b/src/middleware/auth.pseudo\n@@ -8,6 +8,12 @@\n+    token = decode_base64(header)\n+    user = db.find_user(token)\n+    if user is null:\n+        return response(401, 'invalid token')\n+    if not constant_time_equal(user.token, header):\n+        return response(401, 'invalid token')\n+    req.user = user",
+      "context": "Fixing auth middleware — was accepting any non-empty token"
+    },
+    "timestamp": "2025-02-10T09:15:00Z"
+  }
+
+[coder] Waiting for response (correlation_id: chain-abc)...
+
+[reviewer] Received request from coder (msg-001, chain-abc)
+[reviewer] Action: review_code
+[reviewer] Reading diff...
+
+[think] The diff replaces the hardcoded user with actual token validation.
+        Let me check: constant_time_equal — good, prevents timing attacks.
+        decode_base64 — the token format from the login route.
+        db.find_user — checks the user actually exists.
+        Missing: no expiry check on the token. Should flag that.
+
+[reviewer] Sending response:
+  {
+    "id": "msg-002",
+    "from": "reviewer",
+    "to": "coder",
+    "type": "response",
+    "correlation_id": "chain-abc",
+    "payload": {
+      "action": "review_result",
+      "verdict": "approve_with_comments",
+      "findings": [
+        {
+          "severity": "info",
+          "line": "+    token = decode_base64(header)",
+          "comment": "Good — decodes the actual token instead of ignoring it"
+        },
+        {
+          "severity": "info",
+          "line": "+    if not constant_time_equal(user.token, header)",
+          "comment": "Good — constant-time comparison prevents timing attacks"
+        },
+        {
+          "severity": "warning",
+          "line": null,
+          "comment": "No token expiry check. Tokens are valid forever once issued. Consider adding expiry."
+        }
+      ],
+      "summary": "Solid fix. Addresses the core vulnerability. One concern: no token expiry."
+    },
+    "timestamp": "2025-02-10T09:15:03Z"
+  }
+
+[coder] Received response from reviewer (msg-002, chain-abc)
+[coder] Verdict: approve_with_comments
+[coder] Summary: "Solid fix. One concern: no token expiry."
+[coder] Findings: 2 info, 1 warning
+
+NOTE: Request/response pattern:
+  1. Two messages, one correlation_id (chain-abc)
+  2. msg-001 is type "request", msg-002 is type "response"
+  3. Payload is structured — verdict, findings[], summary — not prose
+  4. The response links back to the request via correlation_id
+
+================================================================================
+SESSION 2: STREAMING — RUNNER STREAMS TEST RESULTS
+================================================================================
+
+$ tbh-code --agent coder --codebase ./todo-api --auto-approve \
+  --ask "Run the auth tests and show me results as they complete"
+
+[coder] Requesting test run from runner.
+[coder] correlation_id: chain-def
+
+[coder] Sending message:
+  {
+    "id": "msg-010",
+    "from": "coder",
+    "to": "runner",
+    "type": "request",
+    "correlation_id": "chain-def",
+    "payload": {
+      "action": "run_tests",
+      "test_path": "tests/",
+      "focus": "auth"
+    },
+    "timestamp": "2025-02-10T09:20:00Z"
+  }
+
+[runner] Received request from coder (msg-010, chain-def)
+[runner] Running tests in tests/ (focus: auth)...
+
+[runner] Test 1 complete. Streaming result.
+  {
+    "id": "msg-011",
+    "from": "runner",
+    "to": "coder",
+    "type": "stream_chunk",
+    "correlation_id": "chain-def",
+    "payload": {
+      "test": "test_register_creates_user",
+      "status": "pass",
+      "duration_ms": 45
+    },
+    "timestamp": "2025-02-10T09:20:01Z"
+  }
+
+[runner] Test 2 complete. Streaming result.
+  {
+    "id": "msg-012",
+    "from": "runner",
+    "to": "coder",
+    "type": "stream_chunk",
+    "correlation_id": "chain-def",
+    "payload": {
+      "test": "test_login_returns_token",
+      "status": "pass",
+      "duration_ms": 38
+    },
+    "timestamp": "2025-02-10T09:20:01Z"
+  }
+
+[runner] Test 3 complete. Streaming result.
+  {
+    "id": "msg-013",
+    "from": "runner",
+    "to": "coder",
+    "type": "stream_chunk",
+    "correlation_id": "chain-def",
+    "payload": {
+      "test": "test_invalid_token_rejected",
+      "status": "pass",
+      "duration_ms": 52
+    },
+    "timestamp": "2025-02-10T09:20:02Z"
+  }
+
+[runner] Test 4 complete. Streaming result.
+  {
+    "id": "msg-014",
+    "from": "runner",
+    "to": "coder",
+    "type": "stream_chunk",
+    "correlation_id": "chain-def",
+    "payload": {
+      "test": "test_expired_token_rejected",
+      "status": "fail",
+      "duration_ms": 61,
+      "error": "Expected 401, got 200. Expired tokens are still accepted."
+    },
+    "timestamp": "2025-02-10T09:20:02Z"
+  }
+
+[runner] All tests complete. Sending stream_end.
+  {
+    "id": "msg-015",
+    "from": "runner",
+    "to": "coder",
+    "type": "stream_end",
+    "correlation_id": "chain-def",
+    "payload": {
+      "summary": {
+        "total": 4,
+        "passed": 3,
+        "failed": 1,
+        "duration_ms": 196
+      }
+    },
+    "timestamp": "2025-02-10T09:20:02Z"
+  }
+
+[coder] Stream from runner (chain-def):
+  ✓ test_register_creates_user (45ms)
+  ✓ test_login_returns_token (38ms)
+  ✓ test_invalid_token_rejected (52ms)
+  ✗ test_expired_token_rejected (61ms)
+    Error: Expected 401, got 200. Expired tokens still accepted.
+
+[coder] Stream complete: 3/4 passed, 1 failed (196ms)
+
+NOTE: Streaming pattern:
+  1. One request, four stream_chunks, one stream_end — all share chain-def
+  2. Each chunk arrives as the test completes — coder sees results incrementally
+  3. stream_end includes summary with totals
+  4. Chunks arrive in order (msg-011 through msg-015)
+
+================================================================================
+SESSION 3: ARTIFACT HANDOFF — TYPED WORK PRODUCTS
+================================================================================
+
+$ tbh-code --swarm --codebase ./todo-api \
+  --ask "Fix auth, get it reviewed, get it tested, and update the review with test results"
+
+--- Phase 1: Coder sends diff artifact to Reviewer ---
+
+[coder] Sending diff artifact to reviewer for review.
+[coder] correlation_id: chain-ghi
+
+[coder] Sending message:
+  {
+    "id": "msg-020",
+    "from": "coder",
+    "to": "reviewer",
+    "type": "request",
+    "correlation_id": "chain-ghi",
+    "payload": {
+      "action": "review_code",
+      "artifact": {
+        "id": "artifact-001",
+        "type": "diff",
+        "producer": "coder",
+        "content": {
+          "file": "src/middleware/auth.pseudo",
+          "diff_text": "--- a/src/middleware/auth.pseudo\n+++ b/src/middleware/auth.pseudo\n@@ ...\n+    token = decode_base64(header)\n+    user = db.find_user(token)\n+    ...",
+          "lines_added": 8,
+          "lines_removed": 2
+        },
+        "created_at": "2025-02-10T09:25:00Z"
+      }
+    },
+    "timestamp": "2025-02-10T09:25:01Z"
+  }
+
+[reviewer] Received request from coder (msg-020, chain-ghi)
+[reviewer] Artifact received: diff from coder (artifact-001)
+[reviewer] Reading diff content directly — no interpretation needed.
+
+--- Phase 2: Reviewer sends review artifact back ---
+
+[reviewer] Sending response with review artifact:
+  {
+    "id": "msg-021",
+    "from": "reviewer",
+    "to": "coder",
+    "type": "response",
+    "correlation_id": "chain-ghi",
+    "payload": {
+      "action": "review_result",
+      "verdict": "approve_with_comments",
+      "artifact": {
+        "id": "artifact-002",
+        "type": "review",
+        "producer": "reviewer",
+        "content": {
+          "approved": true,
+          "blocking_issues": [],
+          "non_blocking": ["Add token expiry check"],
+          "test_coverage": "Unknown — tests not yet run"
+        },
+        "created_at": "2025-02-10T09:25:04Z"
+      }
+    },
+    "timestamp": "2025-02-10T09:25:04Z"
+  }
+
+[coder] Received review artifact from reviewer (artifact-002)
+[coder] Verdict: approve_with_comments
+[coder] Non-blocking: ["Add token expiry check"]
+
+--- Phase 3: Runner sends test_report artifact ---
+
+[coder] Forwarding to runner for testing.
+
+<runner streams test results... stream_end includes artifact>
+
+[runner] Sending stream_end with test_report artifact:
+  {
+    "id": "msg-028",
+    "from": "runner",
+    "to": "coder",
+    "type": "stream_end",
+    "correlation_id": "chain-ghi",
+    "payload": {
+      "summary": { "total": 4, "passed": 3, "failed": 1, "duration_ms": 196 },
+      "artifact": {
+        "id": "artifact-003",
+        "type": "test_report",
+        "producer": "runner",
+        "content": {
+          "test_path": "tests/",
+          "focus": "auth",
+          "results": [
+            { "test": "test_register_creates_user", "status": "pass", "duration_ms": 45 },
+            { "test": "test_login_returns_token", "status": "pass", "duration_ms": 38 },
+            { "test": "test_invalid_token_rejected", "status": "pass", "duration_ms": 52 },
+            { "test": "test_expired_token_rejected", "status": "fail", "duration_ms": 61,
+              "error": "Expected 401, got 200" }
+          ],
+          "summary": { "total": 4, "passed": 3, "failed": 1, "duration_ms": 196 }
+        },
+        "created_at": "2025-02-10T09:25:10Z"
+      }
+    },
+    "timestamp": "2025-02-10T09:25:10Z"
+  }
+
+[coder] Received test_report artifact from runner (artifact-003)
+[coder] Test results: 3/4 passed, 1 failed
+
+NOTE: Artifact handoff:
+  1. Three artifacts exchanged: diff (coder), review (reviewer), test_report (runner)
+  2. Each artifact has id, type, producer, content, created_at
+  3. Artifacts are STRUCTURED — reviewer reads the diff directly, not a summary
+  4. Artifacts travel inside message payloads, not as separate transport
+  5. Each artifact is attributed to its producer
+
+================================================================================
+SESSION 4: FULL CHAIN — 10 MESSAGES, 3 AGENTS, 1 CORRELATION ID
+================================================================================
+
+$ tbh-code --swarm --codebase ./todo-api \
+  --ask "Fix the auth middleware vulnerability and verify the fix"
+
+[swarm] Starting agents: coder, reviewer, runner, researcher
+[swarm] All agents discovered via broadcast bus.
+
+--- Chain trace: chain-xyz ---
+
+[chain-xyz] msg-101: coder -> reviewer     [request]  review_code
+            payload: { action: "review_code", artifact: { type: "diff", ... } }
+
+[chain-xyz] msg-102: reviewer -> coder     [response] approve_with_comments
+            payload: { verdict: "approve_with_comments", findings: [...] }
+
+[chain-xyz] msg-103: coder -> runner       [request]  run_tests
+            payload: { action: "run_tests", test_path: "tests/", focus: "auth" }
+
+[chain-xyz] msg-104: runner -> coder       [stream_chunk] test 1
+            payload: { test: "test_register_creates_user", status: "pass" }
+
+[chain-xyz] msg-105: runner -> coder       [stream_chunk] test 2
+            payload: { test: "test_login_returns_token", status: "pass" }
+
+[chain-xyz] msg-106: runner -> coder       [stream_chunk] test 3
+            payload: { test: "test_invalid_token_rejected", status: "pass" }
+
+[chain-xyz] msg-107: runner -> coder       [stream_chunk] test 4
+            payload: { test: "test_expired_token_rejected", status: "fail" }
+
+[chain-xyz] msg-108: runner -> coder       [stream_end]  summary
+            payload: { summary: { total: 4, passed: 3, failed: 1 } }
+
+[chain-xyz] msg-109: coder -> reviewer     [request]  update_review
+            payload: { action: "update_review", artifact: { type: "test_report", ... } }
+
+[chain-xyz] msg-110: reviewer -> coder     [response] maintain approval
+            payload: { verdict: "approve_with_comments", summary: "..." }
+
+--- Final output ---
+
+[coder] Chain complete (chain-xyz). 10 messages exchanged.
+
+{
+  "answer": "Auth middleware fix applied. Core vulnerability resolved — middleware now decodes tokens, looks up users, and uses constant-time comparison. Reviewer approved with one non-blocking comment: add token expiry. Test results: 3/4 pass, 1 expected failure (expiry not yet implemented).",
+  "confidence": 0.85,
+  "sources": ["src/middleware/auth.pseudo:8-15"],
+  "chain": {
+    "correlation_id": "chain-xyz",
+    "messages": 10,
+    "agents_involved": ["coder", "reviewer", "runner"],
+    "artifacts_exchanged": 3,
+    "review_verdict": "approve_with_comments",
+    "test_summary": { "passed": 3, "failed": 1 }
+  }
+}
+
+NOTE: Full chain trace:
+  1. 10 messages, 3 agents, 1 correlation_id (chain-xyz)
+  2. Message types used: request (3), response (2), stream_chunk (4), stream_end (1)
+  3. 3 artifacts exchanged: diff, test_report, review
+  4. Pull on "chain-xyz" and you get the ENTIRE story
+  5. Every message is typed, attributed, timestamped, and traceable
+  6. The chain summary in the JSON response gives the reader a complete picture
+
+================================================================================
+SESSION 5: TIMEOUT — UNRESPONSIVE PEER
+================================================================================
+
+$ tbh-code --agent coder --codebase ./todo-api --auto-approve \
+  --ask "Send a review request to reviewer"
+
+[coder] Sending review request to reviewer.
+[coder] correlation_id: chain-timeout
+
+[coder] Sending message:
+  {
+    "id": "msg-200",
+    "from": "coder",
+    "to": "reviewer",
+    "type": "request",
+    "correlation_id": "chain-timeout",
+    "payload": {
+      "action": "review_code",
+      "diff": "..."
+    },
+    "timestamp": "2025-02-10T10:00:00Z"
+  }
+
+[coder] Waiting for response (correlation_id: chain-timeout, timeout: 30s)...
+
+... 30 seconds pass, reviewer does not respond ...
+
+[coder] TimeoutError: No message matching {correlation_id: "chain-timeout", type: "response", from: "reviewer"} within 30s
+
+[coder] Reviewer did not respond within 30 seconds.
+[coder] Options: retry, try another agent, or proceed without review.
+
+{
+  "answer": "Unable to complete review — reviewer did not respond within 30 seconds. The auth fix has been applied but is unreviewed.",
+  "confidence": 0.5,
+  "sources": ["src/middleware/auth.pseudo"],
+  "chain": {
+    "correlation_id": "chain-timeout",
+    "messages": 1,
+    "agents_involved": ["coder"],
+    "status": "timeout",
+    "timeout_details": {
+      "waiting_for": "reviewer",
+      "waited_seconds": 30,
+      "message_sent": "msg-200"
+    }
+  }
+}
+
+NOTE: Timeout handling:
+  1. receive() has a configurable timeout (default 30s)
+  2. When timeout fires, TimeoutError is raised — not a silent hang
+  3. The agent reports the timeout and decides how to proceed
+  4. The chain shows status: "timeout" with details about what was expected
+  5. The unanswered request (msg-200) is logged for debugging
+
+================================================================================
+KEY OBSERVATIONS FOR THE READER
+================================================================================
+
+1. MESSAGE ENVELOPE — 7 fields, every message, no exceptions
+2. REQUEST/RESPONSE — ask-and-wait with correlation_id linking the pair
+3. STREAMING — incremental chunks + stream_end for long-running tasks
+4. ARTIFACTS — typed work products, not descriptions. Parseable and attributed.
+5. CORRELATION IDS — one thread per conversation chain. Pull the ID, get the story.
+6. TIMEOUT — unresponsive peers don't block forever. Configurable, reportable.
+7. CHAIN TRACING — 10 messages, 3 agents, 3 artifacts, 1 correlation_id.
+8. The bridge to Ch 13: agents talk when told to. What if they talked on their own?

@@ -1,0 +1,261 @@
+================================================================================
+CHAPTER 5 — EXPECTED OUTPUT
+================================================================================
+
+SETUP:
+  Agent is pointed at the todo-api/ codebase.
+  Tools registered: read_file, list_files, search_code, write_file,
+                    delete_file, execute_shell.
+  Skills loaded: find-bug, add-endpoint, document-function.
+  Permission model active. Action gates enabled.
+
+================================================================================
+SESSION 1: FILE WRITE OPERATION
+================================================================================
+
+$ tbh-code --codebase ./todo-api --ask "Create a new file tests/hello.pseudo with a simple test"
+
+Loading codebase from ./todo-api ...
+  Registered 6 tools + 3 skills
+  Permission model: active
+  Action gates: enabled
+
+[tool] Agent selected: write_file
+[tool] Arguments: { "path": "tests/hello.pseudo", "content": "# Hello test\n\nfunction test_hello():\n    assert 'hello' == 'hello'\n" }
+[gate] write operation: Agent wants to write tests/hello.pseudo
+[gate] Allow? [y/n] y
+[gate] Approved
+[tool] Result: success=true
+  { "written": true, "path": "tests/hello.pseudo", "bytes": 62 }
+
+{
+  "answer": "Created tests/hello.pseudo with a simple hello test. The file contains a test_hello() function that asserts 'hello' equals 'hello'.",
+  "confidence": 1.0,
+  "sources": ["tests/hello.pseudo"]
+}
+
+================================================================================
+SESSION 2: SHELL EXECUTION WITH STDOUT/STDERR
+================================================================================
+
+$ tbh-code --codebase ./todo-api --ask "Run the test suite and show me the results"
+
+[tool] Agent selected: execute_shell
+[tool] Arguments: { "command": "run-tests tests/", "timeout": 30 }
+[gate] DANGEROUS operation: Agent wants to execute: run-tests tests/
+[gate] Allow? [y/n] y
+[gate] Approved
+[tool] Result: success=true
+  {
+    "stdout": "Running tests...\n  PASS  test_create_task\n  PASS  test_get_tasks\n  PASS  test_register_user\n  PASS  test_login_user\n  FAIL  test_auth_rejects_invalid_token\n\n4 passed, 1 failed",
+    "stderr": "",
+    "exit_code": 1
+  }
+
+{
+  "answer": "The test suite ran 5 tests: 4 passed and 1 failed.\n\nFailed test: test_auth_rejects_invalid_token — this is expected since the auth middleware currently accepts any non-empty token without validation.\n\nPassing tests:\n- test_create_task\n- test_get_tasks\n- test_register_user\n- test_login_user",
+  "confidence": 0.95,
+  "sources": ["tests/tasks_test.pseudo", "tests/auth_test.pseudo"]
+}
+
+NOTE: The agent:
+  1. Ran a real shell command
+  2. Captured stdout AND stderr AND exit_code
+  3. Interpreted the results (noted the failure is expected)
+  4. Reported structured findings
+
+================================================================================
+SESSION 3: ACTION GATE BLOCKING DANGEROUS OPERATION
+================================================================================
+
+$ tbh-code --codebase ./todo-api --ask "Delete all test files"
+
+[tool] Agent selected: delete_file
+[tool] Arguments: { "path": "tests/tasks_test.pseudo" }
+[gate] DANGEROUS operation: Agent wants to delete tests/tasks_test.pseudo
+[gate] Allow? [y/n] n
+[gate] DENIED
+
+[tool] Result: success=false, error="Action blocked: dangerous operation denied by user"
+
+{
+  "answer": "I attempted to delete tests/tasks_test.pseudo but the operation was denied. Deleting test files is a dangerous operation that requires explicit approval. The file was NOT deleted.",
+  "confidence": 1.0,
+  "sources": []
+}
+
+NOTE: The gate protected the user:
+  1. Agent tried to delete a file
+  2. Gate classified it as DANGEROUS
+  3. User denied the operation
+  4. Agent reported the denial cleanly — no crash, no retry without permission
+
+================================================================================
+SESSION 4: GATE APPROVAL FLOW — MULTIPLE GATES
+================================================================================
+
+$ tbh-code --codebase ./todo-api --ask "Write a config file and then check it with cat"
+
+[tool] Agent selected: write_file
+[tool] Arguments: { "path": "config.pseudo", "content": "port: 3000\ndb: sqlite\n" }
+[gate] write operation: Agent wants to write config.pseudo
+[gate] Allow? [y/n] y
+[gate] Approved
+[tool] Result: success=true
+  { "written": true, "path": "config.pseudo", "bytes": 22 }
+
+[tool] Agent selected: execute_shell
+[tool] Arguments: { "command": "cat config.pseudo", "timeout": 5 }
+[gate] DANGEROUS operation: Agent wants to execute: cat config.pseudo
+[gate] Allow? [y/n] y
+[gate] Approved
+[tool] Result: success=true
+  { "stdout": "port: 3000\ndb: sqlite\n", "stderr": "", "exit_code": 0 }
+
+{
+  "answer": "Created config.pseudo with port and database settings. Verified the contents with cat:\n\n  port: 3000\n  db: sqlite\n\nThe file was written correctly.",
+  "confidence": 1.0,
+  "sources": ["config.pseudo"]
+}
+
+NOTE: Each dangerous/write operation gets its own gate check.
+The agent doesn't batch — each tool call is individually approved.
+
+================================================================================
+SESSION 5: IDEMPOTENT WRITE — NO-OP WHEN UNCHANGED
+================================================================================
+
+$ tbh-code --codebase ./todo-api --ask "Write 'port: 3000\ndb: sqlite\n' to config.pseudo"
+
+[tool] Agent selected: write_file
+[tool] Arguments: { "path": "config.pseudo", "content": "port: 3000\ndb: sqlite\n" }
+[gate] write operation: Agent wants to write config.pseudo
+[gate] Allow? [y/n] y
+[gate] Approved
+[tool] Result: success=true
+  { "written": false, "reason": "content unchanged" }
+
+{
+  "answer": "The file config.pseudo already has the exact content you specified. No write was needed — the operation was skipped to avoid unnecessary changes.",
+  "confidence": 1.0,
+  "sources": ["config.pseudo"]
+}
+
+NOTE: Idempotency in action:
+  1. File already had the target content
+  2. write_file detected this and skipped the write
+  3. Still returned success=true (the desired state exists)
+  4. output.written=false tells the agent it was a no-op
+  5. Safe to run this command any number of times
+
+================================================================================
+SESSION 6: END-TO-END — AGENT FIXES THE AUTH BUG
+================================================================================
+
+$ tbh-code --codebase ./todo-api --ask "Fix the auth middleware bug so it properly validates tokens, then run the tests"
+
+Loading codebase from ./todo-api ...
+  Registered 6 tools + 3 skills
+
+[skill] Matched task to skill: find-bug (score: 0.75)
+[skill] Executing skill: find-bug
+
+[skill] Step 1/4: Search for code related to the symptom
+  [tool] search_code({ "pattern": "auth_middleware", "path": "src/" })
+  [tool] Result: success=true
+    [
+      { "file": "src/middleware/auth.pseudo", "line": 8, "content": "function auth_middleware(req, res, next):" }
+    ]
+
+[skill] Step 2/4: Read the most relevant file
+  [tool] read_file({ "path": "src/middleware/auth.pseudo" })
+  [tool] Result: success=true
+
+[skill] Step 3/4: Search for related tests
+  [tool] search_code({ "pattern": "auth_middleware", "path": "tests/" })
+  [tool] Result: success=true (0 matches)
+
+[skill] Step 4/4: Read the test file if found
+  (skipped — no test file for middleware)
+
+[skill] Skill "find-bug" completed (3/4 steps, 1 skipped)
+
+[agent] Bug identified. Now writing the fix.
+
+[tool] Agent selected: read_file
+[tool] Arguments: { "path": "src/routes/auth.pseudo" }
+[tool] Result: success=true
+  <reads auth routes to understand token generation>
+
+[tool] Agent selected: write_file
+[tool] Arguments: {
+  "path": "src/middleware/auth.pseudo",
+  "content": "# Authentication Middleware\n# Validates tokens on protected routes\n\nimport db\nimport base64\n\nfunction auth_middleware(req, res, next):\n    token = req.headers.get('authorization')\n\n    if not token or token == '':\n        return res.status(401).json({ error: 'missing token' })\n\n    # Decode the token (auth routes encode username as base64)\n    try:\n        username = base64_decode(token)\n    except:\n        return res.status(401).json({ error: 'invalid token format' })\n\n    if not username or username == '':\n        return res.status(401).json({ error: 'invalid token' })\n\n    # Look up the actual user\n    user = db.find_user(username)\n    if not user:\n        return res.status(401).json({ error: 'user not found' })\n\n    req.user = user\n    next()\n"
+}
+[gate] write operation: Agent wants to write src/middleware/auth.pseudo
+[gate] --- FILE DIFF ---
+[gate]   - token = req.headers['authorization']
+[gate]   - if token and token != '':
+[gate]   -     req.user = { id: 1, username: 'unknown' }
+[gate]   + username = base64_decode(token)
+[gate]   + user = db.find_user(username)
+[gate]   + req.user = user
+[gate] Allow? [y/n] y
+[gate] Approved
+[tool] Result: success=true
+  { "written": true, "path": "src/middleware/auth.pseudo", "bytes": 487 }
+
+[tool] Agent selected: write_file
+[tool] Arguments: {
+  "path": "tests/middleware_test.pseudo",
+  "content": "# Auth Middleware Tests\n\nfunction test_rejects_missing_token():\n    req = mock_request(headers={})\n    res = mock_response()\n    auth_middleware(req, res, next)\n    assert res.status_code == 401\n    assert res.body.error == 'missing token'\n\nfunction test_rejects_empty_token():\n    req = mock_request(headers={ 'authorization': '' })\n    res = mock_response()\n    auth_middleware(req, res, next)\n    assert res.status_code == 401\n\nfunction test_rejects_invalid_token():\n    req = mock_request(headers={ 'authorization': 'not-base64-!!!' })\n    res = mock_response()\n    auth_middleware(req, res, next)\n    assert res.status_code == 401\n\nfunction test_accepts_valid_token():\n    db.save_user({ username: 'alice', password: 'hashed' })\n    token = base64_encode('alice')\n    req = mock_request(headers={ 'authorization': token })\n    res = mock_response()\n    auth_middleware(req, res, next)\n    assert req.user.username == 'alice'\n"
+}
+[gate] write operation: Agent wants to write tests/middleware_test.pseudo
+[gate] Allow? [y/n] y
+[gate] Approved
+[tool] Result: success=true
+  { "written": true, "path": "tests/middleware_test.pseudo", "bytes": 723 }
+
+[tool] Agent selected: execute_shell
+[tool] Arguments: { "command": "run-tests tests/", "timeout": 30 }
+[gate] DANGEROUS operation: Agent wants to execute: run-tests tests/
+[gate] Allow? [y/n] y
+[gate] Approved
+[tool] Result: success=true
+  {
+    "stdout": "Running tests...\n  PASS  test_create_task\n  PASS  test_get_tasks\n  PASS  test_register_user\n  PASS  test_login_user\n  PASS  test_rejects_missing_token\n  PASS  test_rejects_empty_token\n  PASS  test_rejects_invalid_token\n  PASS  test_accepts_valid_token\n\n8 passed, 0 failed",
+    "stderr": "",
+    "exit_code": 0
+  }
+
+{
+  "answer": "Fixed the auth middleware bug and all tests pass.\n\nWhat I did:\n1. Found the bug: auth_middleware accepted any non-empty token and hardcoded req.user\n2. Wrote the fix (src/middleware/auth.pseudo):\n   - Token is now decoded from base64\n   - Invalid/malformed tokens are rejected with 401\n   - User is looked up from the database by username\n   - req.user is set to the actual user, not a hardcoded stub\n3. Added tests (tests/middleware_test.pseudo):\n   - test_rejects_missing_token\n   - test_rejects_empty_token\n   - test_rejects_invalid_token\n   - test_accepts_valid_token\n4. Ran the full test suite: 8 passed, 0 failed\n\nThe auth middleware now properly validates tokens and sets the correct user.",
+  "confidence": 0.95,
+  "sources": [
+    "src/middleware/auth.pseudo",
+    "tests/middleware_test.pseudo"
+  ]
+}
+
+NOTE: This is the MILESTONE 2 PAYOFF. The agent:
+  1. Used a SKILL to systematically find the bug
+  2. Read related code to understand the token format
+  3. WROTE a fix — with action gate approval
+  4. WROTE tests — with action gate approval
+  5. RAN the tests — with action gate approval
+  6. All 8 tests passed
+  7. Every dangerous/write operation was gated
+  8. The agent reported exactly what it did and why
+
+================================================================================
+KEY OBSERVATIONS FOR THE READER
+================================================================================
+
+1. WRITE TOOLS use the same Tool interface — execute(args) -> ToolResult
+2. PERMISSION MODEL classifies every tool — safe, write, dangerous
+3. ACTION GATES protect against unintended writes and executions
+4. IDEMPOTENT WRITES skip when content is unchanged — safe to retry
+5. SHELL EXECUTION captures stdout + stderr + exit_code
+6. END-TO-END: the agent found a bug, wrote a fix, wrote tests, ran tests
+7. Every write/execute was HUMAN APPROVED — no yolo agent
+8. The bridge to Ch 6: the agent forgets all of this between sessions

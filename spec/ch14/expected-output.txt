@@ -1,0 +1,445 @@
+================================================================================
+CHAPTER 14 — EXPECTED OUTPUT
+================================================================================
+
+SETUP:
+  Agent swarm running with 4 agents: Coder, Reviewer, Runner, Security Auditor.
+  All prior capabilities active: tools, skills, memory, planning, evaluation,
+  guardrails, self-improvement, agent identity, discovery, messaging, swarm
+  patterns (Ch 1-13).
+  Production layer: checkpoints, distributed tracing, agent versioning,
+  mixed-version handling, idempotency.
+
+================================================================================
+SESSION 1: CHECKPOINT SAVE — NORMAL OPERATION
+================================================================================
+
+$ tbh-code --swarm --task "Refactor payment module validation"
+
+[coder] Task: refactor-payment-validation (task-071)
+[coder] Plan: 5 steps
+
+[coder] Step 1/5: Read payment files
+[tool]  read_file("src/payment/processor.pseudo") -> success
+[tool]  read_file("src/payment/routes.pseudo") -> success
+[coder] Checkpoint saved: task-071/step-1
+  {
+    "agent_id": "coder",
+    "task_id": "task-071",
+    "step_index": 0,
+    "state": {
+      "completed_steps": ["read payment files"],
+      "context_summary": "Read processor.pseudo and routes.pseudo. 3,200 tokens of context."
+    },
+    "timestamp": "2025-03-15T10:00:05Z"
+  }
+
+[coder] Step 2/5: Write payment_validator.pseudo
+[tool]  write_file("src/payment/payment_validator.pseudo") -> success
+[coder] Checkpoint saved: task-071/step-2
+  {
+    "agent_id": "coder",
+    "task_id": "task-071",
+    "step_index": 1,
+    "state": {
+      "completed_steps": ["read payment files", "write validator"],
+      "context_summary": "Written payment_validator.pseudo. 5,100 tokens."
+    },
+    "timestamp": "2025-03-15T10:00:12Z"
+  }
+
+[coder] Step 3/5: Update payment routes
+[tool]  write_file("src/payment/routes.pseudo") -> success
+[coder] Checkpoint saved: task-071/step-3
+  {
+    "agent_id": "coder",
+    "task_id": "task-071",
+    "step_index": 2,
+    "state": {
+      "completed_steps": ["read payment files", "write validator", "update routes"],
+      "context_summary": "Updated routes.pseudo with new validation. 7,400 tokens."
+    },
+    "timestamp": "2025-03-15T10:00:20Z"
+  }
+
+[coder] Step 4/5: Update middleware
+[tool]  write_file("src/middleware/payment.pseudo") -> success
+[coder] Checkpoint saved: task-071/step-4
+  {
+    "agent_id": "coder",
+    "task_id": "task-071",
+    "step_index": 3,
+    "state": {
+      "completed_steps": ["read payment files", "write validator", "update routes", "update middleware"],
+      "context_summary": "Middleware updated. 9,800 tokens."
+    },
+    "timestamp": "2025-03-15T10:00:28Z"
+  }
+
+[coder] Step 5/5: Publish code_ready
+[coder] Publishing: code_ready (task-071)
+[coder] Checkpoint saved: task-071/step-5 (complete)
+
+[coder] Task complete. 5/5 steps. Checkpoints: 5.
+
+NOTE: Checkpoint observations:
+  1. One checkpoint per step boundary
+  2. Each checkpoint includes context_summary for LLM reload
+  3. step_index tracks progress — crash at any point resumes from last saved step
+  4. Checkpoint IDs follow {task_id}/step-{N} pattern
+
+================================================================================
+SESSION 2: CRASH AND RESUME FROM CHECKPOINT
+================================================================================
+
+$ tbh-code --swarm --task "Refactor payment module validation"
+
+[coder] Task: refactor-payment-validation (task-071)
+[coder] Plan: 5 steps
+
+[coder] Step 1/5: Read payment files
+[coder] Checkpoint saved: task-071/step-1
+[coder] Step 2/5: Write payment_validator.pseudo
+[coder] Checkpoint saved: task-071/step-2
+[coder] Step 3/5: Update payment routes
+[coder] Checkpoint saved: task-071/step-3
+
+[coder] Step 4/5: Update middleware...
+
+    ## CRASH -- power failure ##
+
+--- 30 seconds later ---
+
+[system] Power restored. Restarting agents...
+[coder]  Initialized. Checking for checkpoints...
+[coder]  Found checkpoint: task-071/step-3
+  {
+    "agent_id": "coder",
+    "task_id": "task-071",
+    "step_index": 2,
+    "state": {
+      "completed_steps": ["read payment files", "write validator", "update routes"],
+      "context_summary": "Refactoring payment module. Steps 1-3 complete. Written: payment_validator.pseudo, updated routes.pseudo. Next: update middleware."
+    },
+    "timestamp": "2025-03-15T10:00:20Z"
+  }
+
+[coder] Resuming from checkpoint: step 3
+[coder] Context restored: "Refactoring payment module. Steps 1-3 complete.
+         Written: payment_validator.pseudo, updated routes.pseudo.
+         Next: update middleware."
+[coder] Resuming from step 4/5.
+
+[coder] Step 4/5: Update middleware
+[tool]  read_file("src/middleware/payment.pseudo") -> success
+[tool]  write_file("src/middleware/payment.pseudo") -> success
+[coder] Checkpoint saved: task-071/step-4
+
+[coder] Step 5/5: Publish code_ready
+[coder] Publishing: code_ready (task-071)
+[coder] Checkpoint saved: task-071/step-5 (complete)
+
+[coder] Task complete. 5/5 steps. Resumed from crash at step 4.
+         Total wall time: 45s (including 30s downtime)
+         Work lost to crash: 0 steps.
+
+[coder] Cleaning up old checkpoints (keeping last 5)
+
+NOTE: Resume observations:
+  1. Agent detected checkpoint on startup
+  2. Restored context_summary — enough to continue, not identical to original
+  3. Steps 1-3 not repeated — files already on disk from before the crash
+  4. Step 4 re-executed (was in progress when crash occurred)
+  5. Zero work lost. Total overhead: ~0.4s for checkpoint restore
+
+================================================================================
+SESSION 3: DISTRIBUTED TRACE WATERFALL — 4 AGENTS
+================================================================================
+
+$ tbh-code --swarm --trace --task "Add DELETE /tasks/:id endpoint"
+
+[system] Trace started: trace-8f3a
+
+[coder]    Step 1: Read files → Checkpoint
+[coder]    Step 2: Write code → Checkpoint
+[coder]    Publishing: code_ready (task-092)
+[fan-out]  Event code_ready → 3 subscribers: reviewer, runner, security-auditor
+
+[reviewer]      Received code_ready. Reviewing... (8.2s)
+[runner]        Received code_ready. Running tests... (14.6s)
+[security]      Received code_ready. Scanning... (10.3s)
+
+[fan-in]   All 3 responses received for task-092 (14.6s total)
+[coder]    Merging feedback...
+
+[system] Trace complete: trace-8f3a
+
+Trace ID: trace-8f3a
+Duration: 22.4s
+Spans: 17
+
+WATERFALL:
+----------------------------------------------------------------------
+  0s        5s        10s       15s       20s       25s
+  |         |         |         |         |         |
+  ✓ [user]  submit_task ─────────────────────────────── 22.4s
+  ├─ ✓ [coder]  process_task ────────────────────────── 21.8s
+  │  ├─ ✓ [coder]  check_mistake_journal ── 0.3s
+  │  ├─ ✓ [coder]  load_skill ── 0.1s
+  │  ├─ ✓ [coder]  tool:read_file ── 0.2s
+  │  ├─ ✓ [coder]  tool:write_file ── 0.4s
+  │  ├─ ✓ [coder]  publish:code_ready ── 0.1s
+  │  ├─ ✓ [reviewer]  handle_code_ready ────────── 8.2s
+  │  │  ├─ ✓ [reviewer]  tool:read_file ── 0.2s
+  │  │  ├─ ✓ [reviewer]  llm_evaluate ── 7.1s
+  │  │  └─ ✓ [reviewer]  publish:review_complete ── 0.1s
+  │  ├─ ✓ [runner]  handle_code_ready ──────────────── 14.6s
+  │  │  ├─ ✓ [runner]  tool:execute_shell ── 13.8s
+  │  │  └─ ✓ [runner]  publish:tests_complete ── 0.1s
+  │  ├─ ✓ [security]  handle_code_ready ──────── 10.3s
+  │  │  ├─ ✓ [security]  tool:read_file ── 0.2s
+  │  │  ├─ ✓ [security]  llm_evaluate ── 9.4s
+  │  │  └─ ✓ [security]  publish:audit_complete ── 0.1s
+  │  └─ ✓ [coder]  merge_feedback ── 1.2s
+  └─ ✓ [user]  task_complete ── 0.1s
+----------------------------------------------------------------------
+
+Span details:
+  span-001: trace-8f3a | [user]     submit_task        | 0.0s - 22.4s  | ok
+  span-002: trace-8f3a | [coder]    process_task        | 0.3s - 22.1s  | ok      | parent: span-001
+  span-003: trace-8f3a | [coder]    check_mistake_journal| 0.3s - 0.6s  | ok      | parent: span-002
+  span-004: trace-8f3a | [coder]    load_skill          | 0.6s - 0.7s  | ok      | parent: span-002
+  span-005: trace-8f3a | [coder]    tool:read_file      | 0.7s - 0.9s  | ok      | parent: span-002
+  span-006: trace-8f3a | [coder]    tool:write_file     | 0.9s - 1.3s  | ok      | parent: span-002
+  span-007: trace-8f3a | [coder]    publish:code_ready  | 1.3s - 1.4s  | ok      | parent: span-002
+  span-008: trace-8f3a | [reviewer] handle_code_ready   | 1.4s - 9.6s  | ok      | parent: span-007
+  span-009: trace-8f3a | [reviewer] tool:read_file      | 1.5s - 1.7s  | ok      | parent: span-008
+  span-010: trace-8f3a | [reviewer] llm_evaluate        | 1.7s - 8.8s  | ok      | parent: span-008
+  span-011: trace-8f3a | [reviewer] publish:review      | 9.5s - 9.6s  | ok      | parent: span-008
+  span-012: trace-8f3a | [runner]   handle_code_ready   | 1.4s - 16.0s | ok      | parent: span-007
+  span-013: trace-8f3a | [runner]   tool:execute_shell   | 1.5s - 15.3s | ok      | parent: span-012
+  span-014: trace-8f3a | [runner]   publish:tests       | 15.9s - 16.0s | ok      | parent: span-012
+  span-015: trace-8f3a | [security] handle_code_ready   | 1.4s - 11.7s | ok      | parent: span-007
+  span-016: trace-8f3a | [security] llm_evaluate        | 1.6s - 11.0s | ok      | parent: span-015
+  span-017: trace-8f3a | [coder]    merge_feedback      | 16.0s - 17.2s | ok      | parent: span-002
+
+NOTE: Trace observations:
+  1. All spans share trace-8f3a — one trace, many agents
+  2. Parent-child relationships form a tree across agent boundaries
+  3. Reviewer, Runner, Security all have parent span-007 (publish:code_ready)
+  4. Parallel work visible: three agents overlap in the 1.4s-16.0s window
+  5. Critical path: runner at 14.6s — optimize tests, not reviewer
+  6. Trace context propagated via message envelope trace_context field
+
+================================================================================
+SESSION 4: VERSION COMPATIBILITY CHECK — THREE CASES
+================================================================================
+
+$ tbh-code --swarm --version-check
+
+[system] Agent versions:
+  coder:           v2.1.0 (protocol 1.0)
+  reviewer:        v1.3.2 (protocol 1.0)
+  runner:          v2.0.0 (protocol 1.0)
+  security-auditor: v1.2.0 (protocol 1.0)
+
+--- Case 1: Compatible ---
+
+[system] Compatibility check: coder v2.1.0 <-> runner v2.0.0
+[system] Protocol: 1.0 <-> 1.0 → match
+[system] Agent version: major 2 <-> major 2 → match
+[system] Result: COMPATIBLE
+  {
+    "agent_a": "coder",
+    "agent_b": "runner",
+    "result": "compatible",
+    "protocol_match": true,
+    "major_match": true
+  }
+
+--- Case 2: Degraded ---
+
+[system] Compatibility check: coder v2.1.0 <-> reviewer v1.3.2
+[system] Protocol: 1.0 <-> 1.0 → match
+[system] Agent version: major 2 <-> major 1 → MISMATCH
+[system] Result: DEGRADED
+[system] Warning: coder is major version 2, reviewer is major version 1.
+         Degraded mode: structured patches not available.
+         Falling back to raw diff format.
+  {
+    "agent_a": "coder",
+    "agent_b": "reviewer",
+    "result": "degraded",
+    "protocol_match": true,
+    "major_match": false,
+    "fallback": "raw diff format"
+  }
+
+--- Case 3: Incompatible ---
+
+[system] Simulating: coder v2.1.0 (protocol 2.0) <-> reviewer v1.3.2 (protocol 1.0)
+[system] Protocol: 2.0 <-> 1.0 → major MISMATCH
+[system] Result: INCOMPATIBLE
+[system] Error: coder and reviewer cannot communicate.
+         Protocol versions 2.0 and 1.0 are incompatible.
+         Reviewer must upgrade to protocol 2.x to collaborate with coder.
+  {
+    "agent_a": "coder",
+    "agent_b": "reviewer",
+    "result": "incompatible",
+    "protocol_match": false,
+    "reason": "protocol major version mismatch (2 vs 1)"
+  }
+
+NOTE: Compatibility observations:
+  1. Compatible: same protocol, same major agent version → full feature set
+  2. Degraded: same protocol, different major agent version → reduced features
+  3. Incompatible: different protocol major version → cannot communicate
+  4. Degraded is not failure — the swarm still works, just with fewer features
+
+================================================================================
+SESSION 5: MIXED-VERSION SWARM OPERATION
+================================================================================
+
+$ tbh-code --swarm --task "Add DELETE /tasks/:id endpoint" --trace
+
+[system] Swarm state:
+  coder:           v2.1.0 (protocol 1.0) — new model, structured patches
+  reviewer:        v1.3.2 (protocol 1.0) — original, expects raw diffs
+  runner:          v1.0.0 (protocol 1.0) — original
+  security-auditor: v1.2.0 (protocol 1.0) — original
+
+[system] Protocol negotiation for task-088:
+  Agents involved: coder, reviewer, runner, security-auditor
+  Common protocol: 1.0
+  Negotiated capabilities: ["code_review", "test_run", "security_scan"]
+  Degraded features:
+    - coder: structured_patches (reviewer v1 doesn't support it)
+    - coder: parallel_edits (runner v1 doesn't support it)
+  Mode: degraded — raw diffs only
+  {
+    "protocol_version": "1.0",
+    "available_capabilities": ["code_review", "test_run", "security_scan"],
+    "degraded_features": [
+      "coder: structured_patches (not available)",
+      "coder: parallel_edits (not available)"
+    ]
+  }
+
+[coder v2.1.0] Processing task-088
+[coder v2.1.0] Note: operating in degraded mode (raw diff format)
+[coder v2.1.0] Writing implementation...
+[coder v2.1.0] Publishing: code_ready (raw diff, 42 lines)
+
+[reviewer v1.3.2] Received code_ready
+[reviewer v1.3.2] Format: raw diff — compatible with my review logic
+[reviewer v1.3.2] Reviewing... 1 issue found
+[reviewer v1.3.2] Publishing: review_complete
+
+[runner v1.0.0] Received code_ready
+[runner v1.0.0] Running tests... 8 passed, 0 failed
+[runner v1.0.0] Publishing: tests_complete
+
+[security-auditor v1.2.0] Received code_ready
+[security-auditor v1.2.0] Scanning... 0 vulnerabilities
+[security-auditor v1.2.0] Publishing: audit_complete
+
+[system] Task-088 complete.
+  Mixed-version swarm: 4 agents, 4 different versions.
+  Degraded features: 2.
+  Task outcome: success.
+
+NOTE: Mixed-version observations:
+  1. Protocol negotiation happened before task dispatch
+  2. Coder v2.1.0 fell back to raw diffs (reviewer v1 can't parse structured patches)
+  3. All agents completed their work despite version differences
+  4. Feature degradation, not failure — the system does less, but doesn't stop
+  5. Version info attached to every log line for debugging
+
+================================================================================
+SESSION 6: IDEMPOTENT RETRY AFTER PARTIAL FAILURE
+================================================================================
+
+$ tbh-code --swarm --task "Review code change for task-088"
+
+[coder]    Publishing: code_ready (task-088)
+           Idempotency key: coder:task-088:code_ready:1
+
+[reviewer] Received: code_ready (task-088)
+[reviewer] Idempotency check: coder:task-088:code_ready:1 → Proceed
+[reviewer] Starting review...
+[reviewer] LLM evaluation in progress...
+
+    ~~~ network blip — delivery timeout ~~~
+
+[coder]    Delivery timeout. Retrying code_ready (task-088)
+           Idempotency key: coder:task-088:code_ready:1  (same key — same operation)
+
+[reviewer] Received: code_ready (task-088) (retry)
+[reviewer] Idempotency check: coder:task-088:code_ready:1 → AlreadyDone
+[reviewer] Duplicate detected. Returning cached result.
+  {
+    "idempotency_key": "coder:task-088:code_ready:1",
+    "status": "already_done",
+    "cached_result": {
+      "approved": true,
+      "issues": [
+        { "severity": "low", "comment": "Consider adding input validation" }
+      ]
+    }
+  }
+
+... 3 seconds later ...
+
+[reviewer] Original review complete: 1 issue found.
+[reviewer] Recording result for: coder:task-088:code_ready:1
+[reviewer] Publishing: review_complete (task-088)
+
+[coder]    Received: review_complete (1 copy — duplicate suppressed)
+[coder]    Review: approved with 1 low-severity comment
+
+--- Saga integration ---
+
+[coder]    Saga: deploy-task-088 (3 steps)
+[coder]    Step 1: write_code (saga: deploy-task-088:write_code:1)
+[coder]    Idempotency check: → Proceed
+[coder]    Step 1 complete. Recorded.
+
+[coder]    Step 2: run_review (saga: deploy-task-088:run_review:1)
+[coder]    Idempotency check: → Proceed
+[coder]    Step 2 complete. Recorded.
+
+[coder]    Step 3: run_tests — FAILED (timeout)
+[coder]    Retrying saga from step 3...
+
+[coder]    Step 1: write_code (saga: deploy-task-088:write_code:1)
+[coder]    Idempotency check: → AlreadyDone (skipping)
+
+[coder]    Step 2: run_review (saga: deploy-task-088:run_review:1)
+[coder]    Idempotency check: → AlreadyDone (skipping)
+
+[coder]    Step 3: run_tests (saga: deploy-task-088:run_tests:2)  ← attempt 2
+[coder]    Idempotency check: → Proceed
+[coder]    Running tests... 8 passed, 0 failed
+[coder]    Step 3 complete. Saga complete.
+
+NOTE: Idempotency observations:
+  1. Same idempotency key on retry → duplicate detected, cached result returned
+  2. Different sequence number → treated as new operation (saga step retry)
+  3. Saga retry: steps 1-2 skipped (already done), only step 3 re-executed
+  4. One review, one result, even though message delivered twice
+  5. TTL on idempotency records (1 hour) prevents unbounded storage growth
+
+================================================================================
+KEY OBSERVATIONS FOR THE READER
+================================================================================
+
+1. CHECKPOINTS — save at boundaries, restore on startup, resume from last step
+2. CRASH RECOVERY — context_summary gives the LLM enough to continue (not identical, close enough)
+3. DISTRIBUTED TRACING — trace context propagates through message envelopes, waterfall shows the story
+4. PARENT-CHILD SPANS — tree structure across agents, not just flat list
+5. VERSION COMPATIBILITY — three outcomes: compatible, degraded, incompatible
+6. MIXED-VERSION — negotiate to lowest common capability, degrade features not function
+7. IDEMPOTENCY — check before process, record after complete, duplicates return cached result
+8. SAGA + IDEMPOTENCY — retry saga from scratch, completed steps are skipped automatically
+9. The bridge to Ch 15: the swarm is durable, observable, and safely deployable — but it's a closed system. External tools and agents are next.
