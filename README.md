@@ -24,12 +24,18 @@ By the end of this book, your agent will read codebases, edit files, run command
 |----|-------|----------------|
 | 0 | [The Starting Line](chapters/ch00.md) | API keys, Python setup, project skeleton, smoke test |
 
+> 📁 [spec/ch00/](spec/ch00/) — [prompt-template.md](spec/ch00/prompt-template.md) · [interface-spec.md](spec/ch00/interface-spec.md) · [expected-output.txt](spec/ch00/expected-output.txt) · [test_ch00.py](spec/ch00/validation/test_ch00.py)
+
 ### Foundation
 
 | Ch | Title | What You Build |
 |----|-------|----------------|
 | 1 | [The One-Shot Trap and the Loop That Fixes It](chapters/ch01.md) | Prompt wrapper → watch it fail → discover the agent loop |
 | 2 | [Your First Real Agent](chapters/ch02.md) | Working agent that answers questions about a codebase |
+
+> 📁 [spec/ch01/](spec/ch01/) — [prompt-template.md](spec/ch01/prompt-template.md) · [interface-spec.md](spec/ch01/interface-spec.md) · [expected-output.txt](spec/ch01/expected-output.txt) · [test_ch01.py](spec/ch01/validation/test_ch01.py)
+>
+> 📁 [spec/ch02/](spec/ch02/) — [prompt-template.md](spec/ch02/prompt-template.md) · [interface-spec.md](spec/ch02/interface-spec.md) · [expected-output.txt](spec/ch02/expected-output.txt) · [test_ch02.py](spec/ch02/validation/test_ch02.py)
 
 ### Tools & Skills
 
@@ -38,6 +44,12 @@ By the end of this book, your agent will read codebases, edit files, run command
 | 3 | [Tool Use + MCP](chapters/ch03.md) | Tool calling interface with MCP server/client |
 | 4 | [Skills: Teaching Your Agent What To Do](chapters/ch04.md) | Playbooks/recipes that compose tools into behaviors |
 | 5 | [File System + Shell](chapters/ch05.md) | Agent reads/writes files, runs commands |
+
+> 📁 [spec/ch03/](spec/ch03/) — [prompt-template.md](spec/ch03/prompt-template.md) · [interface-spec.md](spec/ch03/interface-spec.md) · [expected-output.txt](spec/ch03/expected-output.txt) · [test_ch03.py](spec/ch03/validation/test_ch03.py)
+>
+> 📁 [spec/ch04/](spec/ch04/) — [prompt-template.md](spec/ch04/prompt-template.md) · [interface-spec.md](spec/ch04/interface-spec.md) · [expected-output.txt](spec/ch04/expected-output.txt) · [test_ch04.py](spec/ch04/validation/test_ch04.py)
+>
+> 📁 [spec/ch05/](spec/ch05/) — [prompt-template.md](spec/ch05/prompt-template.md) · [interface-spec.md](spec/ch05/interface-spec.md) · [expected-output.txt](spec/ch05/expected-output.txt) · [test_ch05.py](spec/ch05/validation/test_ch05.py)
 
 ### Intelligence
 
@@ -48,6 +60,14 @@ By the end of this book, your agent will read codebases, edit files, run command
 | 8 | [Evaluation & Guardrails](chapters/ch08.md) | Self-check, lint, human gate, diagnostic feedback |
 | 9 | [Self-Improvement: Agents That Get Better](chapters/ch09.md) | Mistake journal, skill rewriting, evaluator-optimizer |
 
+> 📁 [spec/ch06/](spec/ch06/) — [prompt-template.md](spec/ch06/prompt-template.md) · [interface-spec.md](spec/ch06/interface-spec.md) · [expected-output.txt](spec/ch06/expected-output.txt) · [test_ch06.py](spec/ch06/validation/test_ch06.py)
+>
+> 📁 [spec/ch07/](spec/ch07/) — [prompt-template.md](spec/ch07/prompt-template.md) · [interface-spec.md](spec/ch07/interface-spec.md) · [expected-output.txt](spec/ch07/expected-output.txt) · [test_ch07.py](spec/ch07/validation/test_ch07.py)
+>
+> 📁 [spec/ch08/](spec/ch08/) — [prompt-template.md](spec/ch08/prompt-template.md) · [interface-spec.md](spec/ch08/interface-spec.md) · [expected-output.txt](spec/ch08/expected-output.txt) · [test_ch08.py](spec/ch08/validation/test_ch08.py)
+>
+> 📁 [spec/ch09/](spec/ch09/) — [prompt-template.md](spec/ch09/prompt-template.md) · [interface-spec.md](spec/ch09/interface-spec.md) · [expected-output.txt](spec/ch09/expected-output.txt) · [test_ch09.py](spec/ch09/validation/test_ch09.py)
+
 ### The Agent Swarm
 
 | Ch | Title | What You Build |
@@ -57,12 +77,24 @@ By the end of this book, your agent will read codebases, edit files, run command
 | 12 | [Peer Communication](chapters/ch12.md) | Direct agent-to-agent messaging, artifact handoffs |
 | 13 | [Swarm Patterns](chapters/ch13.md) | Orchestrator-workers → peer coordination, consensus, collective learning |
 
+> 📁 [spec/ch10/](spec/ch10/) — [prompt-template.md](spec/ch10/prompt-template.md) · [interface-spec.md](spec/ch10/interface-spec.md) · [expected-output.txt](spec/ch10/expected-output.txt) · [test_ch10.py](spec/ch10/validation/test_ch10.py)
+>
+> 📁 [spec/ch11/](spec/ch11/) — [prompt-template.md](spec/ch11/prompt-template.md) · [interface-spec.md](spec/ch11/interface-spec.md) · [expected-output.txt](spec/ch11/expected-output.txt) · [test_ch11.py](spec/ch11/validation/test_ch11.py)
+>
+> 📁 [spec/ch12/](spec/ch12/) — [prompt-template.md](spec/ch12/prompt-template.md) · [interface-spec.md](spec/ch12/interface-spec.md) · [expected-output.txt](spec/ch12/expected-output.txt) · [test_ch12.py](spec/ch12/validation/test_ch12.py)
+>
+> 📁 [spec/ch13/](spec/ch13/) — [prompt-template.md](spec/ch13/prompt-template.md) · [interface-spec.md](spec/ch13/interface-spec.md) · [expected-output.txt](spec/ch13/expected-output.txt) · [test_ch13.py](spec/ch13/validation/test_ch13.py)
+
 ### Production
 
 | Ch | Title | What You Build |
 |----|-------|----------------|
 | 14 | [Production Architecture](chapters/ch14.md) | Checkpoints, tracing, versioned deploys |
 | 15 | [The Agent Ecosystem](chapters/ch15.md) | External MCP tools, A2A partner agents, governance |
+
+> 📁 [spec/ch14/](spec/ch14/) — [prompt-template.md](spec/ch14/prompt-template.md) · [interface-spec.md](spec/ch14/interface-spec.md) · [expected-output.txt](spec/ch14/expected-output.txt) · [test_ch14.py](spec/ch14/validation/test_ch14.py)
+>
+> 📁 [spec/ch15/](spec/ch15/) — [prompt-template.md](spec/ch15/prompt-template.md) · [interface-spec.md](spec/ch15/interface-spec.md) · [expected-output.txt](spec/ch15/expected-output.txt) · [test_ch15.py](spec/ch15/validation/test_ch15.py)
 
 ---
 
