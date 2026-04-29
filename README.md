@@ -1,18 +1,22 @@
 # The Builder's Handbook: Agents That Think and Self-Improve
 
-*The Builder's Handbook (TBH), you should build it yourself.*
+---
+
+## Learn How Agents Work — By Building One.
+
+You use AI coding agents every day — Cursor, Claude Code, Copilot, Aider. You type a prompt. It reads your files, edits your code, runs your tests, catches its own mistakes.
+
+Do you know how any of that actually works?
+
+This book shows you — by making you build one from scratch. A **CLI coding agent** called `tbh-code`, from first LLM call to multi-agent swarm. You'll understand every layer because you built every layer.
 
 ---
 
-## What You're Building
+## Two Ways to Read
 
-A **CLI coding agent** — from scratch, in any language you choose.
+**Read only.** Skip Chapter 0, start at [Chapter 1](chapters/ch01.md). Every concept is explained with diagrams, traces, and full output — no setup required to follow along.
 
-By the end of this book, your agent will read codebases, edit files, run commands, plan multi-step tasks, learn from its mistakes, and coordinate with peer agents in a local swarm. You'll understand every layer because you built every layer.
-
-**Build target:** `tbh-code` — a terminal coding agent like OpenCode, Codex CLI, Claude Code or Aider.
-
-**Language:** Python by default (least boilerplate). Specs are language-agnostic — bring Rust, Go, TypeScript if you prefer.
+**Build as you read.** Start at [Chapter 0](chapters/ch00.md) to set up your environment (~10 minutes). Each chapter has a spec and validation tests. You build, you run, you see it work. Python by default (least boilerplate) — specs are language-agnostic, so bring Rust, Go, or TypeScript if you prefer.
 
 ---
 
@@ -22,7 +26,7 @@ By the end of this book, your agent will read codebases, edit files, run command
 
 | Ch | Title | What You Build |
 |----|-------|----------------|
-| 0 | [The Starting Line](chapters/ch00.md) | API keys, Python setup, project skeleton, smoke test |
+| 0 | [Setup (Optional)](chapters/ch00.md) | API keys, Python setup, project skeleton, smoke test |
 
 ### Foundation
 
@@ -66,30 +70,6 @@ By the end of this book, your agent will read codebases, edit files, run command
 
 ---
 
-## Build Progression
-
-What `tbh-code` looks like at each stage:
-
-```
-Ch 1:  prompt → LLM → text → FAIL → add loop                      one-shot → agent loop
-Ch 2:  prompt → LLM + codebase context → answer                    augmented LLM
-Ch 3:  prompt → LLM → [MCP tools] → verify                         tool use + protocol
-Ch 4:  + skill specs that compose tools into behaviors              skills
-Ch 5:  prompt → LLM → [read/write/exec] → verify                   real actions
-Ch 6:  + session memory, outcome tracking                           memory + learning
-Ch 7:  + task planning, strategy refinement                         planning + adapting
-Ch 8:  + self-check, diagnostic feedback                            evaluation + diagnosis
-Ch 9:  + mistake journal, skill rewriting                           self-improvement
-Ch 10: monolith → [coder, reviewer, runner, researcher]             split into agents
-Ch 11: agents broadcast capabilities + skills                       discovery + sharing
-Ch 12: agents message each other directly                           peer communication
-Ch 13: swarm self-organizes: fan-out, review, consensus             swarm patterns
-Ch 14: + checkpoints, tracing, versioned deploys                    production
-Ch 15: + external MCP tools, A2A partner agents                     ecosystem
-```
-
----
-
 ## How to Use This Book
 
 1. **Read the chapter** — understand the concept and why it matters.
@@ -118,6 +98,31 @@ spec/chNN/
 └── validation/
     └── test_chNN.py        Automated tests your code must pass
 ```
+
+---
+
+<details>
+<summary>Build Progression — what <code>tbh-code</code> looks like at each stage</summary>
+
+```
+Ch 1:  prompt → LLM → text → FAIL → add loop                      one-shot → agent loop
+Ch 2:  prompt → LLM + codebase context → answer                    augmented LLM
+Ch 3:  prompt → LLM → [MCP tools] → verify                         tool use + protocol
+Ch 4:  + skill specs that compose tools into behaviors              skills
+Ch 5:  prompt → LLM → [read/write/exec] → verify                   real actions
+Ch 6:  + session memory, outcome tracking                           memory + learning
+Ch 7:  + task planning, strategy refinement                         planning + adapting
+Ch 8:  + self-check, diagnostic feedback                            evaluation + diagnosis
+Ch 9:  + mistake journal, skill rewriting                           self-improvement
+Ch 10: monolith → [coder, reviewer, runner, researcher]             split into agents
+Ch 11: agents broadcast capabilities + skills                       discovery + sharing
+Ch 12: agents message each other directly                           peer communication
+Ch 13: swarm self-organizes: fan-out, review, consensus             swarm patterns
+Ch 14: + checkpoints, tracing, versioned deploys                    production
+Ch 15: + external MCP tools, A2A partner agents                     ecosystem
+```
+
+</details>
 
 ---
 
