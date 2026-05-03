@@ -4,11 +4,13 @@
 
 Set up the development environment for `tbh-code`. By the end of this chapter, the reader has:
 
-1. An LLM API key configured as an environment variable
+1. An LLM API key configured in a local `.env` file
 2. A Python 3.10+ project with virtual environment and SDK installed
 3. The `todo-api` example codebase copied into their project
 4. A project skeleton ready for Chapter 1
 5. A passing smoke test that proves the LLM connection works
+
+Constraint: `tbh-code` must be created as a sibling folder to the book repo, not inside it.
 
 ---
 
@@ -31,20 +33,25 @@ tbh-code/
 
 A minimal script that:
 - Imports the LLM SDK (Anthropic or OpenAI)
-- Reads the API key from an environment variable (NOT hardcoded)
+- Loads `.env` and reads the API key from environment variables (NOT hardcoded)
 - Sends a single prompt: `"Say 'tbh-code ready' and nothing else."`
 - Prints the response text to stdout
 - Exits with code 0 on success, non-zero on failure
 
-### 3. Environment Variables
+### 3. Local Environment File
 
 ```bash
-# One of:
-ANTHROPIC_API_KEY=sk-ant-...
-OPENAI_API_KEY=sk-...
+.env
+  # One of:
+  ANTHROPIC_API_KEY=sk-ant-...
+  OPENAI_API_KEY=sk-...
 ```
 
-The smoke test must NOT contain the API key. It reads from the environment.
+Also include `.env.example` (no secrets) and ensure `.env` is in `.gitignore`.
+
+The smoke test must NOT contain the API key. It reads from environment variables loaded from `.env`.
+
+Important: this `.env` is for the reader's `tbh-code` program runtime, not for the companion coding agent chat itself.
 
 ---
 
@@ -52,7 +59,8 @@ The smoke test must NOT contain the API key. It reads from the environment.
 
 - [ ] `python3 --version` returns 3.10+
 - [ ] Virtual environment exists and is activated
-- [ ] `pip list` shows `anthropic` or `openai` installed
+- [ ] `pip list` shows `anthropic` or `openai` and `python-dotenv` installed
 - [ ] `todo-api/` directory exists with ~10 `.pseudo` files
 - [ ] `python smoke_test.py` outputs `tbh-code ready` (or close)
+- [ ] `.env` exists locally and is ignored by git
 - [ ] No API keys in source files

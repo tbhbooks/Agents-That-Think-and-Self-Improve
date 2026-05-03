@@ -4,6 +4,16 @@
 
 Build a prompt wrapper that calls an LLM once, observe it fail on a real task, then refactor it into an agent loop.
 
+## Prerequisite Configuration
+
+Carry forward the Chapter 0 setup:
+
+- keep API keys in `.env` (project root), not in source code
+- load environment variables via `python-dotenv` in `tbh_code/llm.py`
+- read model selection from `TBH_MODEL` with a sensible default
+
+Clarify to the reader: these `.env` values are used by the `tbh-code` program they are building, not by the companion coding agent itself.
+
 ## Learning Objectives
 
 - Understand why a single LLM call produces confident but unreliable output

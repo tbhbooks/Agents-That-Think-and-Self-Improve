@@ -15,6 +15,7 @@ Or:
 import subprocess
 import os
 import sys
+from pathlib import Path
 
 # ============================================================================
 # CONFIGURATION
@@ -24,6 +25,21 @@ import sys
 PROJECT_ROOT = os.environ.get("TBH_PROJECT_ROOT", os.getcwd())
 TODO_API_PATH = os.path.join(PROJECT_ROOT, "todo-api")
 SMOKE_TEST_PATH = os.path.join(PROJECT_ROOT, "smoke_test.py")
+ENV_PATH = Path(PROJECT_ROOT) / ".env"
+
+
+def _load_dotenv_fallback(dotenv_path: Path) -> None:
+    """Minimal dotenv loader used if python-dotenv import fails."""
+    if not dotenv_path.exists():
+        return
+    for line in dotenv_path.read_text().splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        os.environ.setdefault(key, value)
 
 
 # ============================================================================
@@ -59,13 +75,44 @@ class TestPythonEnvironment:
         )
 
     def test_api_key_set(self):
-        """At least one LLM API key must be in environment."""
+        """At least one LLM API key must be available via .env or environment."""
+        try:
+            from dotenv import load_dotenv
+            load_dotenv(ENV_PATH)
+        except ImportError:
+            _load_dotenv_fallback(ENV_PATH)
+
         has_anthropic = bool(os.environ.get("ANTHROPIC_API_KEY"))
         has_openai = bool(os.environ.get("OPENAI_API_KEY"))
         assert has_anthropic or has_openai, (
-            "No API key found. Set ANTHROPIC_API_KEY or OPENAI_API_KEY "
-            "in your environment."
+            "No API key found. Add ANTHROPIC_API_KEY or OPENAI_API_KEY "
+            "to .env (preferred) or your environment."
         )
+
+    def test_dotenv_installed(self):
+        """python-dotenv should be installed for local .env loading."""
+        try:
+            import dotenv  # noqa: F401
+        except ImportError:
+            assert False, "python-dotenv is not installed. Run: pip install python-dotenv"
+
+    def test_dotenv_file_exists(self):
+        """.env should exist in project root."""
+        assert ENV_PATH.exists(), (
+            f".env not found at {ENV_PATH}. Create .env with your API key."
+        )
+
+    def test_dotenv_ignored_by_git(self):
+        """.env should be git-ignored."""
+        gitignore_path = Path(PROJECT_ROOT) / ".gitignore"
+        if not gitignore_path.exists():
+            assert False, ".gitignore not found. Add .env to .gitignore."
+        ignored = any(
+            line.strip() == ".env"
+            for line in gitignore_path.read_text().splitlines()
+            if line.strip() and not line.strip().startswith("#")
+        )
+        assert ignored, ".env is not listed in .gitignore."
 
     def test_api_key_not_in_source(self):
         """API keys must not be hardcoded in smoke_test.py."""

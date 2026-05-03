@@ -37,10 +37,12 @@ The reader provides their own LLM API key. The spec does not mandate a provider.
 
 ```
 Config:
-    api_key: string (from environment variable)
+    api_key: string (from `.env`-loaded environment variable)
     model: string (reader's choice)
     max_tokens: int (default: 1024)
 ```
+
+Chapter 1 should continue the Chapter 0 convention: use `python-dotenv` to load `.env` in `tbh_code/llm.py`, and never hardcode API keys in source.
 
 ---
 

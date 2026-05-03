@@ -4,15 +4,17 @@ CHAPTER 0 — EXPECTED OUTPUT
 
 SETUP:
   Reader has Python 3.10+, an API key, and the book repo cloned.
+  tbh-code will be created as a sibling folder to the book repo.
 
 ================================================================================
 STEP 1: CREATE PROJECT
 ================================================================================
 
+$ cd /path/to/parent-containing-this-book
 $ mkdir tbh-code && cd tbh-code
 $ python3 -m venv .venv
 $ source .venv/bin/activate
-$ pip install anthropic
+$ pip install anthropic python-dotenv
 
 ...
 Successfully installed anthropic-x.x.x ...
@@ -20,11 +22,17 @@ Successfully installed anthropic-x.x.x ...
 $ mkdir -p tbh_code
 $ touch tbh_code/__init__.py
 
+$ cat > .env <<'EOF'
+ANTHROPIC_API_KEY=sk-ant-...
+EOF
+
+$ echo ".env" >> .gitignore
+
 ================================================================================
 STEP 2: COPY TODO-API
 ================================================================================
 
-$ cp -r /path/to/book-repo/spec/todo-api ./todo-api
+$ cp -r ../Agents-That-Think-and-Self-Improve/spec/todo-api ./todo-api
 
 $ ls todo-api/src/
 main.pseudo  routes/  models/  middleware/  db.pseudo
@@ -66,7 +74,7 @@ COMMON ERRORS
 ================================================================================
 
 ERROR: AuthenticationError
-  → API key not set. Run: export ANTHROPIC_API_KEY="sk-ant-..."
+  → API key not set. Add ANTHROPIC_API_KEY to .env in project root.
 
 ERROR: ModuleNotFoundError: No module named 'anthropic'
   → SDK not installed. Run: pip install anthropic
@@ -80,7 +88,8 @@ EXIT CRITERIA
 ================================================================================
 
 ✓ python3 --version → 3.10+
-✓ pip list shows anthropic or openai
+✓ pip list shows anthropic or openai, plus python-dotenv
 ✓ todo-api/ has ~10 .pseudo files
 ✓ python smoke_test.py → "tbh-code ready"
+✓ .env exists and is git-ignored
 ✓ No API keys in any source file
