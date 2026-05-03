@@ -7,8 +7,8 @@
   },
   "agent_kit": {
     "name": "tbhbooks-agent-kit",
-    "version": "1.0.4",
-    "download_url": "https://github.com/tbhbooks/tbhbooks-agent-kit/releases/download/tbhbooks-agent-kit-v1.0.4/tbhbooks-agent-kit-v1.0.4.zip",
+    "version": "1.0.5",
+    "download_url": "https://github.com/tbhbooks/tbhbooks-agent-kit/releases/download/tbhbooks-agent-kit-v1.0.5/tbhbooks-agent-kit-v1.0.5.zip",
     "install_path": ".tbh/tbhbooks-agent-kit",
     "fallback": "local-minimal",
     "requires_consent_before_download": true,

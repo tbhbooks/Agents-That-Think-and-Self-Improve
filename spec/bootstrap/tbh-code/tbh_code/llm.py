@@ -39,23 +39,44 @@ def _chat_cli(messages) -> str:
         sys.path.append(str(adapters_dir))
 
     try:
-        from cli_backends import claude_exec, codex_exec, cursor_exec
+        from cli_backends import (
+            CLIBackendError,
+            claude_exec,
+            codex_exec,
+            cursor_exec,
+        )
     except Exception as exc:  # pragma: no cover - bootstrap helper
         raise RuntimeError(
             f"Unable to import CLI adapters from {adapters_dir}."
         ) from exc
 
+    # Claude CLI does not support nesting inside a Claude Code session.
+    if CLI_BACKEND == "claude" and any(
+        os.environ.get(var)
+        for var in ("CLAUDE_PROJECT_DIR", "CLAUDECODE", "CLAUDE_CODE_SESSION_ID")
+    ):
+        raise RuntimeError(
+            "TBH_CLI_BACKEND=claude cannot run inside a Claude Code session "
+            "(nested Claude CLI is blocked). Use TBH_CLI_BACKEND=cursor or "
+            "TBH_CLI_BACKEND=codex, or switch to TBH_LLM_BACKEND=api."
+        )
+
     prompt = _messages_to_prompt(messages)
-    if CLI_BACKEND == "claude":
-        return claude_exec(prompt)
-    if CLI_BACKEND == "cursor":
-        return cursor_exec(prompt)
-    if CLI_BACKEND == "codex":
-        return codex_exec(prompt)
-    raise ValueError(
-        f"Unsupported TBH_CLI_BACKEND={CLI_BACKEND!r}. "
-        "Use one of: claude, cursor, codex."
-    )
+    try:
+        if CLI_BACKEND == "claude":
+            return claude_exec(prompt)
+        if CLI_BACKEND == "cursor":
+            return cursor_exec(prompt)
+        if CLI_BACKEND == "codex":
+            return codex_exec(prompt)
+        raise ValueError(
+            f"Unsupported TBH_CLI_BACKEND={CLI_BACKEND!r}. "
+            "Use one of: claude, cursor, codex."
+        )
+    except CLIBackendError as exc:
+        raise RuntimeError(
+            f"CLI backend failed for TBH_CLI_BACKEND={CLI_BACKEND!r}: {exc}"
+        ) from exc
 
 
 def chat(messages, **kwargs):

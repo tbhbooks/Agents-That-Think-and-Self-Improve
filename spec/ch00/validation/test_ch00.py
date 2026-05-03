@@ -75,18 +75,23 @@ class TestPythonEnvironment:
         )
 
     def test_api_key_set(self):
-        """At least one LLM API key must be available via .env or environment."""
+        """Require API key only for API backend; allow CLI backend without keys."""
         try:
             from dotenv import load_dotenv
             load_dotenv(ENV_PATH)
         except ImportError:
             _load_dotenv_fallback(ENV_PATH)
 
+        backend = os.environ.get("TBH_LLM_BACKEND", "api").strip().lower()
+        if backend == "cli":
+            return
+
         has_anthropic = bool(os.environ.get("ANTHROPIC_API_KEY"))
         has_openai = bool(os.environ.get("OPENAI_API_KEY"))
         assert has_anthropic or has_openai, (
             "No API key found. Add ANTHROPIC_API_KEY or OPENAI_API_KEY "
-            "to .env (preferred) or your environment."
+            "to .env (preferred) or your environment. "
+            "If using CLI backend, set TBH_LLM_BACKEND=cli."
         )
 
     def test_dotenv_installed(self):
@@ -208,7 +213,8 @@ class TestSmokeTest:
             [sys.executable, SMOKE_TEST_PATH],
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=60,
+            cwd=PROJECT_ROOT,
         )
         assert result.returncode == 0, (
             f"smoke_test.py failed (exit code {result.returncode}):\n"
@@ -223,7 +229,8 @@ class TestSmokeTest:
             [sys.executable, SMOKE_TEST_PATH],
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=60,
+            cwd=PROJECT_ROOT,
         )
         assert result.returncode == 0, (
             f"smoke_test.py failed: {result.stderr}"

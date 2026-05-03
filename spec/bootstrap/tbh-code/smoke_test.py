@@ -1,16 +1,11 @@
-"""Chapter 0 smoke test."""
+"""Chapter 0 smoke test.
 
-import aisuite as ai
-from dotenv import load_dotenv
+Uses the shared llm wrapper so .env backend selection works:
+- TBH_LLM_BACKEND=api
+- TBH_LLM_BACKEND=cli
+"""
 
-load_dotenv()
-client = ai.Client()
+from tbh_code.llm import chat
 
-MODEL = "anthropic:claude-sonnet-4-20250514"
-
-response = client.chat.completions.create(
-    model=MODEL,
-    max_tokens=100,
-    messages=[{"role": "user", "content": "Say 'tbh-code ready' and nothing else."}],
-)
-print(response.choices[0].message.content)
+reply = chat([{"role": "user", "content": "Say 'tbh-code ready' and nothing else."}])
+print(reply)
