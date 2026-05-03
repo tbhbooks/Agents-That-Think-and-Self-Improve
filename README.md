@@ -27,7 +27,7 @@ If you are using Cursor, Claude Code, Codex, OpenClaw, or another coding agent:
 1. Open this repo in your coding agent.
 2. Ask it to read [`AGENTS.md`](AGENTS.md) first.
 3. Let it inspect `agents/manifest.json` and [`BOOK_CONTEXT.md`](BOOK_CONTEXT.md).
-4. If it offers to install `tbhbooks-agent-kit`, approve only after it shows the pinned version and release URL.
+4. If it offers to install [`tbhbooks-agent-kit`](https://github.com/tbhbooks/tbhbooks-agent-kit), approve only after it shows the pinned version and release URL.
 5. Ask: `Start with Chapter 0 setup for this TBH book, create tbh-code as a sibling folder to this repo (not inside it), then continue to Chapter 1 in guided build mode.`
 
 > **API keys are required for `tbh-code`.**
