@@ -99,6 +99,22 @@ Keys must be stored in environment variables, never in source code.
 
 Load them from `.env` during local development and keep `.env` out of version control.
 
+Book policy: API keys are required for `tbh-code` runtime in this chapter.
+
+---
+
+## Optional CLI Adapter Path (External)
+
+Keep CLI-based runtime adapters outside this chapter interface spec, in a separate optional folder/repo next to `todo-api` inside `tbh-code/` (example: `tbh-agent-adapters/`).
+
+If used, adapters may execute:
+
+- `claude -p ...`
+- `agent -p ...` (Cursor CLI)
+- `codex exec --json ...`
+
+This is an optional experimental path only. It must not replace the required `smoke_test.py` and `tbh_code/llm.py` baseline for Chapter 0.
+
 ---
 
 ## What This Chapter Does NOT Include

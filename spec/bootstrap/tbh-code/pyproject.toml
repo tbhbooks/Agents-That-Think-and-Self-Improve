@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tbh-code"
+version = "0.0.1"
+description = "Chapter 0 bootstrap for The Builder's Handbook agent project."
+requires-python = ">=3.10"
+dependencies = [
+  "aisuite[anthropic]",
+  "python-dotenv",
+]

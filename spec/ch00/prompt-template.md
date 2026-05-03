@@ -11,6 +11,7 @@ Set up the development environment for `tbh-code`. By the end of this chapter, t
 5. A passing smoke test that proves the LLM connection works
 
 Constraint: `tbh-code` must be created as a sibling folder to the book repo, not inside it.
+Policy: API keys are required for `tbh-code` runtime and must be loaded from `.env` (not hardcoded).
 
 ---
 
@@ -28,6 +29,8 @@ tbh-code/
 ├── todo-api/             # copied from spec/todo-api/
 └── smoke_test.py         # LLM connectivity test
 ```
+
+Optional fast path: allow copying starter files from `spec/bootstrap/tbh-code/`.
 
 ### 2. LLM Client Smoke Test
 
@@ -52,6 +55,20 @@ Also include `.env.example` (no secrets) and ensure `.env` is in `.gitignore`.
 The smoke test must NOT contain the API key. It reads from environment variables loaded from `.env`.
 
 Important: this `.env` is for the reader's `tbh-code` program runtime, not for the companion coding agent chat itself.
+
+### 4. Optional CLI Adapter Repo (Outside Interface Spec)
+
+If the reader wants local agent runtime experiments, create a separate optional repo/folder in `tbh-code/` next to `todo-api/`, for example:
+
+`tbh-agent-adapters/python/cli_backends.py`
+
+Adapters can shell out to:
+
+- `claude -p ...`
+- `agent -p ...` (Cursor CLI)
+- `codex exec --json ...`
+
+This path is optional and experimental for Chapter 0. Do not make it required for validation.
 
 ---
 
