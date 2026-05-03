@@ -20,20 +20,21 @@ This book shows you — by making you build one from scratch. A **CLI coding age
 
 ---
 
-## Agent Quick Start
+## Quick Start
 
 If you are using Cursor, Claude Code, Codex, OpenClaw, or another coding agent:
 
 1. Open this repo in your coding agent.
 2. Ask it to read [`AGENTS.md`](AGENTS.md) first.
 3. Let it inspect `agents/manifest.json` and [`BOOK_CONTEXT.md`](BOOK_CONTEXT.md).
-4. If it offers to install [`tbhbooks-agent-kit`](https://github.com/tbhbooks/tbhbooks-agent-kit), approve only after it shows the pinned version and release URL.
-5. Ask: `Start with Chapter 0 setup for this TBH book, create tbh-code as a sibling folder to this repo (not inside it), then continue to Chapter 1 in guided build mode.`
+4. Install [`tbhbooks-agent-kit`](https://github.com/tbhbooks/tbhbooks-agent-kit) first — your fast lane to learn faster and ship better code with fewer prompts.
+   **Call to action:** Ask your agent: `Install tbhbooks-agent-kit.`
+5. Ask exactly: `Start with Chapter 0 setup for this TBH book, create tbh-code as a sibling folder to this repo (not inside it), then continue to Chapter 1 in guided build mode.`
 
 > **API keys are required for `tbh-code`.**
 > Even when you use a companion coding agent, your `tbh-code` project must still configure provider keys (for example in `.env`) to run LLM calls.
 
-The kit is optional but useful. It gives agents shared TBH workflows for setup, chapter building, hints, validation, reviews, progress state, and live references. Agents must ask a single first Y/N install question, wait for that answer before any other question, and ask separately before running any downloaded script.
+The kit is optional but useful. It gives agents shared TBH workflows for setup, chapter building, hints, validation, reviews, progress state, and live references.
 
 ---
 
