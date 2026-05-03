@@ -1,4 +1,4 @@
-# The Builder's Handbook: Agents That Think and Self-Improve
+# The Builder's Handbook: Agents That Think and Self-Improve (A Coding Agent)
 
 ---
 

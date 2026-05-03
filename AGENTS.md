@@ -29,13 +29,15 @@ Use this pitch:
 If `.tbh/tbhbooks-agent-kit/` is missing:
 
 1. Explain the value proposition from the pitch above.
-2. Check the latest GitHub release for `tbhbooks/tbhbooks-agent-kit` if network access is available and `.tbh/config.json` has no `last_agent_kit_release_check` or it is older than one day.
-3. Show the manifest-pinned version and the latest GitHub version if they differ.
-4. Ask which pinned release to use before downloading anything.
-5. Download only from an explicit GitHub release asset URL, preferably the URL in `agents/manifest.json`.
-6. Store it under `.tbh/tbhbooks-agent-kit/`.
-7. Ask separately before executing downloaded scripts.
-8. If the reader declines, continue using local fallback files.
+2. Ask one first decision question only: "Do you want me to install `tbhbooks-agent-kit` now? (Y/N)".
+3. Wait for the reader's Y/N response before asking any other question.
+4. If the reader answers N, continue using local fallback files and do not ask additional install questions.
+5. If the reader answers Y, check the latest GitHub release for `tbhbooks/tbhbooks-agent-kit` if network access is available and `.tbh/config.json` has no `last_agent_kit_release_check` or it is older than one day.
+6. Show the manifest-pinned version and the latest GitHub version if they differ.
+7. If multiple pinned versions are available, ask which one to use.
+8. Download only from an explicit GitHub release asset URL, preferably the URL in `agents/manifest.json`.
+9. Store it under `.tbh/tbhbooks-agent-kit/`.
+10. Ask separately before executing downloaded scripts.
 
 If `.tbh/tbhbooks-agent-kit/` exists, compare `.tbh/tbhbooks-agent-kit/VERSION` with `agent_kit.version` in `agents/manifest.json`, then optionally check the latest GitHub release at most once per day. Store that check time in `.tbh/config.json` as `last_agent_kit_release_check`. If a newer pinned release exists, explain the installed version, manifest version, latest version, and release URL, then ask before downloading and replacing the local kit.
 
