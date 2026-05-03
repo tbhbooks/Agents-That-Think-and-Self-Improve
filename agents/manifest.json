@@ -1,0 +1,99 @@
+{
+  "manifest_version": "1.0.0",
+  "scope": "book",
+  "registry": {
+    "url": "https://raw.githubusercontent.com/tbhbooks/tbh-skill/main/books/registry.json",
+    "supports_multiple_books": true
+  },
+  "agent_kit": {
+    "name": "tbhbooks-agent-kit",
+    "version": "1.0.4",
+    "download_url": "https://github.com/tbhbooks/tbhbooks-agent-kit/releases/download/tbhbooks-agent-kit-v1.0.4/tbhbooks-agent-kit-v1.0.4.zip",
+    "install_path": ".tbh/tbhbooks-agent-kit",
+    "fallback": "local-minimal",
+    "requires_consent_before_download": true,
+    "requires_separate_consent_before_execute": true
+  },
+  "book": {
+    "id": "agents",
+    "title": "The Builder's Handbook: Agents That Think and Self-Improve",
+    "project_name": "tbh-code",
+    "repo": "https://github.com/tbhbooks/Agents-That-Think-and-Self-Improve",
+    "raw_base": "https://raw.githubusercontent.com/tbhbooks/Agents-That-Think-and-Self-Improve/main",
+    "spec_path": "spec",
+    "chapters_path": "chapters",
+    "context_file": "BOOK_CONTEXT.md",
+    "agent_entry_file": "AGENTS.md",
+    "prompt_gallery_file": "PROMPT_GALLERY.md",
+    "reader_guide_file": "READER_GUIDE.md",
+    "total_chapters": 15,
+    "default_language": "python"
+  },
+  "spec": {
+    "chapter_format": "chNN",
+    "required_files": [
+      "prompt-template.md",
+      "interface-spec.md",
+      "expected-output.txt"
+    ],
+    "optional_files": []
+  },
+  "validation": {
+    "type": "pytest-command",
+    "command_env_prefix": "TBH_AGENTS",
+    "runner_docs": null
+  },
+  "state": {
+    "directory": ".tbh",
+    "config_file": ".tbh/config.json",
+    "progress_file": ".tbh/progress.json",
+    "cache_directory": ".tbh/cache",
+    "agent_kit_directory": ".tbh/tbhbooks-agent-kit"
+  },
+  "commands": [
+    "setup",
+    "status",
+    "build-chapter",
+    "validate",
+    "hint",
+    "review",
+    "next",
+    "switch",
+    "explain"
+  ],
+  "targets": {
+    "root": {
+      "required_files": [
+        "AGENTS.md",
+        "BOOK_CONTEXT.md",
+        "CLAUDE.md",
+        "CODEX.md",
+        "CURSOR.md",
+        "PROMPT_GALLERY.md",
+        "READER_GUIDE.md"
+      ]
+    },
+    "cursor": {
+      "required_files": [
+        "CURSOR.md",
+        ".cursor/rules/tbh-reader.mdc"
+      ]
+    },
+    "claude": {
+      "required_files": [
+        "CLAUDE.md"
+      ]
+    },
+    "codex": {
+      "required_files": [
+        "CODEX.md"
+      ]
+    },
+    "generic": {
+      "required_files": [
+        "AGENTS.md",
+        "agents/generic/bootstrap-prompt.md"
+      ]
+    }
+  }
+}

@@ -20,6 +20,20 @@ This book shows you — by making you build one from scratch. A **CLI coding age
 
 ---
 
+## Agent Quick Start
+
+If you are using Cursor, Claude Code, Codex, OpenClaw, or another coding agent:
+
+1. Open this repo in your coding agent.
+2. Ask it to read [`AGENTS.md`](AGENTS.md) first.
+3. Let it inspect `agents/manifest.json` and [`BOOK_CONTEXT.md`](BOOK_CONTEXT.md).
+4. If it offers to install `tbhbooks-agent-kit`, approve only after it shows the pinned version and release URL.
+5. Ask: `Start with Chapter 0 setup for this TBH book, create the tbh-code workspace, then continue to Chapter 1 in guided build mode.`
+
+The kit is optional but useful. It gives agents shared TBH workflows for setup, chapter building, hints, validation, reviews, progress state, and live references. Agents must ask before downloading it and must ask separately before running any downloaded script.
+
+---
+
 ## Table of Contents
 
 ### Getting Started
@@ -81,6 +95,8 @@ This book shows you — by making you build one from scratch. A **CLI coding age
    > /plugin install tbh@the-builders-handbook
    > /tbh:setup
    > ```
+   >
+   > **Using Cursor, Codex, OpenClaw, or another coding agent?** Follow the [Agent Quick Start](#agent-quick-start). Runtime shim files (`CURSOR.md`, `CODEX.md`, `CLAUDE.md`) point to [`AGENTS.md`](AGENTS.md); other agents should fall back to it directly.
 4. **Validate** — run the validation tests in `spec/chNN/validation/` to confirm your implementation works.
 5. **Move on** — each chapter builds on the last. Your agent grows incrementally.
 
