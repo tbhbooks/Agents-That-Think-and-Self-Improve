@@ -24,12 +24,19 @@ This book shows you — by making you build one from scratch. A **CLI coding age
 
 If you are using Cursor, Claude Code, Codex, OpenClaw, or another coding agent:
 
-1. Open this repo in your coding agent.
-2. [`tbhbooks-agent-kit`](https://github.com/tbhbooks/tbhbooks-agent-kit) is the fastest way to turn your agent into a chapter-by-chapter learning and coding coach. Paste this prompt:
+1. Clone this repo:
+
+   ```sh
+   git clone https://github.com/tbhbooks/Agents-That-Think-and-Self-Improve.git
+   cd Agents-That-Think-and-Self-Improve
+   ```
+
+2. Open this repo in your coding agent.
+3. [`tbhbooks-agent-kit`](https://github.com/tbhbooks/tbhbooks-agent-kit) is the fastest way to turn your agent into a chapter-by-chapter learning and coding coach. Paste this prompt:
 
    > Read AGENTS.md first, then install tbhbooks-agent-kit.
 
-3. After the installation, paste this prompt:
+4. After the installation, paste this prompt:
 
    > Start with Chapter 0 setup for this TBH book, create tbh-code as a sibling folder to this repo (not inside it), then continue to Chapter 1 in guided build mode.
 

@@ -23,6 +23,7 @@ venv/
 *.mobi
 _build/
 site/
+book/
 
 # Examples
 examples/
