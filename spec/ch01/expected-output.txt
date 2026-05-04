@@ -37,28 +37,32 @@ PROGRAM 2: AGENT LOOP MODE
 $ tbh-code --mode loop --task "Find the security vulnerability in the todo-api authentication system." --max-iterations 5
 
 [loop] Iteration 1:
-  [observe] Task: find auth vulnerability. No prior results. No file access.
-  [think] I should analyze the authentication system. Without seeing the code,
-          I'll reason about common auth vulnerabilities.
-  [act] The authentication system likely has a vulnerability in token validation.
+  [observe] Task: find auth vulnerability in todo-api. No prior results. No file access.
+  [think] (LLM) I should analyze the authentication system. Without seeing the code,
+          I'll reason about common auth vulnerabilities and try to identify the
+          most likely location and pattern. I'll focus on token validation since
+          that's the most common auth weakness.
+  [act] (LLM) The authentication system likely has a vulnerability in token validation.
         Common issues include: missing signature verification, no expiry checks,
         or insecure token storage. The file is probably `auth_handler.py` or
         `middleware/auth.py` and the function might be `validate_token()` or
         `check_auth()`.
   [reflect] confidence=0.2
-            issues=["I'm guessing file names — I haven't seen the codebase",
+            issues=["Guessing file names — haven't seen the codebase",
                     "Multiple hedge words: 'likely', 'probably', 'might be'",
                     "No specific evidence for any claim"]
             should_continue=true
 
 [loop] Iteration 2:
-  [observe] Previous answer had low confidence (0.2). Issues: guessing file
-            names, heavy hedging. I need to be more careful about what I
-            actually know vs what I'm guessing.
-  [think] I can't verify file names or function names without seeing the code.
-          I should be explicit about what I know (common patterns) vs what I
-          don't know (this specific codebase).
-  [act] I cannot identify the specific file or function without access to the
+  [observe] Previous answer had low confidence (0.2). Reflect issues: guessing file
+            names, heavy hedging, no evidence. Prior answer excerpt: "The
+            authentication system likely has a vulnerability..."
+  [think] (LLM) My last answer invented file names I can't verify. The reflect
+          phase flagged heavy hedging and no evidence. I should separate what I
+          actually know (common auth patterns) from what I'm guessing (specific
+          file names and functions in this codebase). I'll be explicit about the
+          boundary.
+  [act] (LLM) I cannot identify the specific file or function without access to the
         codebase. However, based on common patterns, auth vulnerabilities
         typically appear in: (1) the token generation logic — weak tokens or
         missing signatures, (2) the token validation middleware — accepting
@@ -71,12 +75,15 @@ $ tbh-code --mode loop --task "Find the security vulnerability in the todo-api a
             should_continue=true
 
 [loop] Iteration 3:
-  [observe] Confidence improved (0.5) but still can't name specifics. The answer
-            is honest but not actionable. Without file access, I can't go further.
-  [think] I've reached the limit of what I can do without tools. My answer is
-          as grounded as possible given my constraints. Further iterations won't
-          improve it.
-  [act] Based on analysis without direct code access: the authentication system
+  [observe] Confidence improved (0.5) but still can't name specifics. Reflect
+            issues: no verification of specific files, but honesty improved.
+            Prior answer was honest about limitations.
+  [think] (LLM) I've reached the limit of what I can do without tools. My answer
+          is as grounded as possible given my constraints. The reflect phase
+          noted the honesty improvement. Further iterations won't add new
+          information — I should give my best final answer acknowledging what
+          I can't verify.
+  [act] (LLM) Based on analysis without direct code access: the authentication system
         most likely has a vulnerability in its token validation logic. The
         middleware that checks auth tokens may accept tokens without verifying
         the signature, checking expiry, or confirming the user exists. I cannot
@@ -98,6 +105,7 @@ NOTE: This response is BETTER than one-shot:
   ✓ Correctly identifies the category of vulnerability (token validation)
   ✓ Correctly identifies the location (middleware)
   ✓ Honest about its limitations — "I cannot confirm without reading"
+  ✓ The [think] phase shows visible LLM reasoning that adapts between iterations
   ✗ Still can't name the exact file or bug (needs tools — Ch 2+)
   → The loop caught the hallucination. But it hit a ceiling.
   → That ceiling is the bridge to Ch 2: "give the agent eyes."

@@ -37,10 +37,12 @@ The reader provides their own LLM API key. The spec does not mandate a provider.
 
 ```
 Config:
-    api_key: string (from environment variable)
+    api_key: string (from `.env`-loaded environment variable)
     model: string (reader's choice)
     max_tokens: int (default: 1024)
 ```
+
+Chapter 1 should continue the Chapter 0 convention: use `python-dotenv` to load `.env` in `tbh_code/llm.py`, and never hardcode API keys in source.
 
 ---
 
@@ -72,31 +74,37 @@ StepTrace:
 Each iteration of the loop executes four phases:
 
 ```
-observe(task, previous_result) → observation
+observe(task, previous_result, previous_issues) → observation        [CODE-ONLY]
     # What do I know? What can I see?
-    # In Ch 1: limited to the task description and prior iterations
-    # In Ch 2+: will include file contents, tool results, etc.
+    # In Ch 1: Combine the task description, prior iterations, and the issues detected in the previous reflect phase.
+    # This observation MUST be fed into the prompt for the next phases so the LLM can correct itself!
+    # No LLM call — this is assembled in code from known context.
 
-think(observation) → plan
+think(observation) → plan                                           [LLM CALL]
     # What should I do next?
-    # Produce a short reasoning trace
+    # Ask the LLM to reason about the observation and produce a short plan/strategy.
+    # Use a low max_tokens (e.g. 256) to keep this focused and cheap.
+    # The plan output is fed into the act prompt.
 
-act(plan) → result
+act(plan, observation) → result                                     [LLM CALL]
     # Execute the plan
-    # In Ch 1: ask the LLM to produce an answer
+    # Ask the LLM to produce an answer, guided by the think plan.
     # In Ch 2+: will include tool calls, file reads, etc.
 
-reflect(task, result) → ReflectOutcome
+reflect(task, result) → ReflectOutcome                              [CODE-ONLY]
     # Is this answer grounded? Am I confident?
     # Check: does the answer reference specific, verifiable facts?
     # Check: does the answer contain hedging language ("might", "probably")?
     # Check: has the answer improved since last iteration?
+    # In Ch 1: heuristic code checks only (no LLM). Later chapters may escalate.
 
 ReflectOutcome:
     should_continue: bool
     confidence: float (0.0 to 1.0)
     issues: string[]  # what's still wrong
 ```
+
+**LLM calls per iteration in Ch 1: 2** (`think` + `act`). `observe` and `reflect` are code-only.
 
 ### Loop Termination
 

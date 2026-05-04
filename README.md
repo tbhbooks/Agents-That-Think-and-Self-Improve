@@ -1,4 +1,4 @@
-# The Builder's Handbook: Agents That Think and Self-Improve
+# The Builder's Handbook: Agents That Think and Self-Improve (A Coding Agent)
 
 ---
 
@@ -16,7 +16,28 @@ This book shows you — by making you build one from scratch. A **CLI coding age
 
 **Read only.** Skip Chapter 0, start at [Chapter 1](chapters/ch01.md). Every concept is explained with diagrams, traces, and full output — no setup required to follow along.
 
-**Build as you read.** Start at [Chapter 0](chapters/ch00.md) to set up your environment (~10 minutes). Each chapter has a spec and validation tests. You build, you run, you see it work. Python by default (least boilerplate) — specs are language-agnostic, so bring Rust, Go, or TypeScript if you prefer.
+**Build as you read.** Start at [Chapter 0](chapters/ch00.md) to set up your environment (~10 minutes). Install [uv](https://docs.astral.sh/uv/) once, then use `uv run tbh-code ...` the same way every chapter — no venv activation, no path management. Each chapter has a spec and validation tests. You build, you run, you see it work. Python by default (least boilerplate) — specs are language-agnostic, so bring Rust, Go, or TypeScript if you prefer.
+
+---
+
+## Quick Start
+
+If you are using Cursor, Claude Code, Codex, OpenClaw, or another coding agent:
+
+1. Open this repo in your coding agent.
+2. [`tbhbooks-agent-kit`](https://github.com/tbhbooks/tbhbooks-agent-kit) is the fastest way to turn your agent into a chapter-by-chapter learning and coding coach. Paste this prompt:
+
+   > Read AGENTS.md first, then install tbhbooks-agent-kit.
+
+3. After the installation, paste this prompt:
+
+   > Start with Chapter 0 setup for this TBH book, create tbh-code as a sibling folder to this repo (not inside it), then continue to Chapter 1 in guided build mode.
+
+Note - 
+> **API keys are required for `tbh-code`.**
+> Even when you use a companion coding agent, your `tbh-code` project must still configure provider keys (for example in `.env`) to run LLM calls.
+
+The kit is optional but useful. It gives agents shared TBH workflows for setup, chapter building, hints, validation, reviews, progress state, and live references.
 
 ---
 
@@ -81,6 +102,8 @@ This book shows you — by making you build one from scratch. A **CLI coding age
    > /plugin install tbh@the-builders-handbook
    > /tbh:setup
    > ```
+   >
+   > **Using Cursor, Codex, OpenClaw, or another coding agent?** Follow the [Agent Quick Start](#agent-quick-start). Runtime shim files (`CURSOR.md`, `CODEX.md`, `CLAUDE.md`) point to [`AGENTS.md`](AGENTS.md); other agents should fall back to it directly.
 4. **Validate** — run the validation tests in `spec/chNN/validation/` to confirm your implementation works.
 5. **Move on** — each chapter builds on the last. Your agent grows incrementally.
 

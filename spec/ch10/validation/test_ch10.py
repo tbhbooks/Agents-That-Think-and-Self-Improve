@@ -26,6 +26,7 @@ Adjust AGENT_CMD and TODO_API_PATH below to match the reader's setup.
 import subprocess
 import json
 import os
+from pathlib import Path
 import re
 import sys
 
@@ -34,7 +35,7 @@ import sys
 # ============================================================================
 
 AGENT_CMD = "tbh-code"
-TODO_API_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "todo-api")
+TODO_API_PATH = str((Path(__file__).resolve().parents[2] / "todo-api"))
 
 AGENT_NAMES = ["coder", "reviewer", "runner", "researcher"]
 

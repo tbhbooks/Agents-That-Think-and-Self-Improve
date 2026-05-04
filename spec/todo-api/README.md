@@ -18,8 +18,19 @@ A small REST API for managing tasks. Used as the running example throughout the 
 
 ```
 # Install dependencies
+# Copy env template: cp .env.example .env
 # Start the server on port 3000
 # Run tests
+```
+
+## Environment
+
+Use a local `.env` file for runtime configuration. Do not hardcode secrets in source files.
+
+Example:
+
+```bash
+cp .env.example .env
 ```
 
 ## Known Issues

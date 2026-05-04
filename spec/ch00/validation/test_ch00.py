@@ -10,11 +10,25 @@ Run from the reader's project root:
 
 Or:
     python test_ch00.py
+
+TBH_VALIDATION_MODE (default: external)
+  external (default) — live LLM smoke tests are skipped when run inside an
+    agent terminal (Cursor, Claude Code, etc.) to prevent timeouts.
+    Run them yourself in a separate terminal and paste the result back:
+      cd ../tbh-code && uv run python smoke_test.py
+  inline — set this to run smoke tests directly inside the agent terminal.
 """
 
 import subprocess
 import os
 import sys
+from pathlib import Path
+
+try:
+    import pytest
+    _PYTEST_AVAILABLE = True
+except ImportError:
+    _PYTEST_AVAILABLE = False
 
 # ============================================================================
 # CONFIGURATION
@@ -24,6 +38,21 @@ import sys
 PROJECT_ROOT = os.environ.get("TBH_PROJECT_ROOT", os.getcwd())
 TODO_API_PATH = os.path.join(PROJECT_ROOT, "todo-api")
 SMOKE_TEST_PATH = os.path.join(PROJECT_ROOT, "smoke_test.py")
+ENV_PATH = Path(PROJECT_ROOT) / ".env"
+
+
+def _load_dotenv_fallback(dotenv_path: Path) -> None:
+    """Minimal dotenv loader used if python-dotenv import fails."""
+    if not dotenv_path.exists():
+        return
+    for line in dotenv_path.read_text().splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        os.environ.setdefault(key, value)
 
 
 # ============================================================================
@@ -59,13 +88,49 @@ class TestPythonEnvironment:
         )
 
     def test_api_key_set(self):
-        """At least one LLM API key must be in environment."""
+        """Require API key only for API backend; allow CLI backend without keys."""
+        try:
+            from dotenv import load_dotenv
+            load_dotenv(ENV_PATH)
+        except ImportError:
+            _load_dotenv_fallback(ENV_PATH)
+
+        backend = os.environ.get("TBH_LLM_BACKEND", "api").strip().lower()
+        if backend == "cli":
+            return
+
         has_anthropic = bool(os.environ.get("ANTHROPIC_API_KEY"))
         has_openai = bool(os.environ.get("OPENAI_API_KEY"))
         assert has_anthropic or has_openai, (
-            "No API key found. Set ANTHROPIC_API_KEY or OPENAI_API_KEY "
-            "in your environment."
+            "No API key found. Add ANTHROPIC_API_KEY or OPENAI_API_KEY "
+            "to .env (preferred) or your environment. "
+            "If using CLI backend, set TBH_LLM_BACKEND=cli."
         )
+
+    def test_dotenv_installed(self):
+        """python-dotenv should be installed for local .env loading."""
+        try:
+            import dotenv  # noqa: F401
+        except ImportError:
+            assert False, "python-dotenv is not installed. Run: pip install python-dotenv"
+
+    def test_dotenv_file_exists(self):
+        """.env should exist in project root."""
+        assert ENV_PATH.exists(), (
+            f".env not found at {ENV_PATH}. Create .env with your API key."
+        )
+
+    def test_dotenv_ignored_by_git(self):
+        """.env should be git-ignored."""
+        gitignore_path = Path(PROJECT_ROOT) / ".gitignore"
+        if not gitignore_path.exists():
+            assert False, ".gitignore not found. Add .env to .gitignore."
+        ignored = any(
+            line.strip() == ".env"
+            for line in gitignore_path.read_text().splitlines()
+            if line.strip() and not line.strip().startswith("#")
+        )
+        assert ignored, ".env is not listed in .gitignore."
 
     def test_api_key_not_in_source(self):
         """API keys must not be hardcoded in smoke_test.py."""
@@ -150,18 +215,45 @@ class TestProjectStructure:
 # TESTS — SMOKE TEST
 # ============================================================================
 
+def _external_validation_mode() -> bool:
+    """Return True unless TBH_VALIDATION_MODE=inline is explicitly set.
+
+    Default (unset or 'external'): smoke tests are skipped — run them in a
+    separate terminal to avoid agent-terminal timeouts.
+    Opt-in ('inline'): smoke tests run inside the agent terminal directly.
+    """
+    return os.environ.get("TBH_VALIDATION_MODE", "external").lower() != "inline"
+
+
+def _skip_or_fail_external(test_name: str) -> None:
+    """Skip (pytest) or raise AssertionError (standalone) when in external mode."""
+    if _external_validation_mode():
+        msg = (
+            f"{test_name} skipped — TBH_VALIDATION_MODE=external.\n"
+            "Run smoke tests in a separate terminal:\n"
+            "  cd ../tbh-code && uv run python smoke_test.py\n"
+            "Paste the output back here."
+        )
+        if _PYTEST_AVAILABLE:
+            pytest.skip(msg)
+        else:
+            raise AssertionError(f"SKIP: {msg}")
+
+
 class TestSmokeTest:
     """The smoke test must run and get a response from the LLM."""
 
     def test_smoke_test_runs(self):
         """smoke_test.py must execute without errors."""
+        _skip_or_fail_external("test_smoke_test_runs")
         if not os.path.exists(SMOKE_TEST_PATH):
             assert False, "smoke_test.py not found — skipping"
         result = subprocess.run(
             [sys.executable, SMOKE_TEST_PATH],
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=60,
+            cwd=PROJECT_ROOT,
         )
         assert result.returncode == 0, (
             f"smoke_test.py failed (exit code {result.returncode}):\n"
@@ -170,13 +262,15 @@ class TestSmokeTest:
 
     def test_smoke_test_output(self):
         """smoke_test.py must output 'tbh-code ready'."""
+        _skip_or_fail_external("test_smoke_test_output")
         if not os.path.exists(SMOKE_TEST_PATH):
             assert False, "smoke_test.py not found — skipping"
         result = subprocess.run(
             [sys.executable, SMOKE_TEST_PATH],
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=60,
+            cwd=PROJECT_ROOT,
         )
         assert result.returncode == 0, (
             f"smoke_test.py failed: {result.stderr}"

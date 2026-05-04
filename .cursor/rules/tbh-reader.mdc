@@ -1,0 +1,15 @@
+---
+description: TBH reader companion behavior
+globs:
+  - "AGENTS.md"
+  - "BOOK_CONTEXT.md"
+  - "agents/manifest.json"
+  - "chapters/**"
+  - "spec/**"
+  - ".tbh/**"
+alwaysApply: false
+---
+
+Read `AGENTS.md` first and treat it as the source of truth.
+
+Use chapter specs as implementation requirements, keep guidance specific, avoid full chapter solutions by default, and use `.tbh/` state when available. Use `tbhbooks-agent-kit` as the canonical shared workflow reference if `.tbh/tbhbooks-agent-kit/` is installed.

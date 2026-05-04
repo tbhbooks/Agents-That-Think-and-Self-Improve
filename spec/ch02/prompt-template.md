@@ -39,3 +39,13 @@ Build a working agent that can answer questions about a codebase by reading file
 - Conversation history as short-term memory
 - Structured output parsing
 - Context window management
+
+## Validate
+
+After implementing, run the tests from your `tbh-code/` sibling folder:
+
+```bash
+uv run pytest ../Agents-That-Think-and-Self-Improve/spec/ch02/validation/test_ch02.py -v
+```
+
+All tests should pass before moving to Chapter 3.
